@@ -19,7 +19,7 @@ async function loadDir(path: string): Promise<string[]> {
         if (link.endsWith('/')) {
             promises.push(loadDir(link).then(v => result.push(...v)));
         } else {
-            result.push(decodeURI(link));
+            result.push(link);
         }
     }
     await Promise.all(promises);
@@ -33,7 +33,7 @@ loadDir(prefix)
         const parsed = files.filter(file => file.endsWith('.flac') || file.endsWith('.mp3'))
             .map(file => {
                 const withoutPrefix = file.substring(prefix.length);
-                const [fileArtist, fileAlbum, fileName] = withoutPrefix.split("/", 3);
+                const [fileArtist, fileAlbum, fileName] = decodeURI(decodeURI(withoutPrefix)).split("/", 3);
             const name = fileName.substring(0, fileName.lastIndexOf('.'));
             const s: Song = { name: name, album: fileAlbum, artist: fileArtist, total: withoutPrefix };
             return s;
@@ -56,7 +56,7 @@ const Application = ({ files }: { files: Song[] }) => {
                     <td onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPlaylist(prev => prev.filter(s => s.total !== song.total)) }}>X</td>
             </tr>)}
             </table></div>
-        <audio controls src={`${prefix}${encodeURI(playlist.at(current)?.total) ?? ''}`} autoPlay onEnded={(e) => setCurrent(prev => prev + 1)}></audio>
+        <audio controls src={`${prefix}${playlist.at(current)?.total ?? ''}`} autoPlay onEnded={(e) => setCurrent(prev => prev + 1)}></audio>
         <Searcher addToList={(file) => startTransition(() => { setPlaylist(file); setCurrent(0); })} files={files}></Searcher>
     </StrictMode>
 };
