@@ -142,7 +142,8 @@ const RenderTree = ({ node, addToList }: { node: TreeNode, addToList: Adder }) =
     return <li>
         <span className={list.length === 0 ? '' : styles.caret}
             onClick={(e) => setUlOpen(prev => !prev)}>
-            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(shuffle(recursiveAllSongs(node))) }}>{node.name}</button>
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(shuffle(recursiveAllSongs(node))) }}>Play {node.name}</button>
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(recursiveAllSongs(node)) }}>Play in order {node.name}</button>
         </span>
         <ul className={`${styles.nested} ${ulOpen ? styles.active : ''}`} >
             {list.map(node => <RenderTree node={node} addToList={addToList} />)}
