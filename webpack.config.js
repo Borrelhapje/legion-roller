@@ -1,7 +1,7 @@
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 
 export default {
-    mode: 'development',
+    mode: 'production',
     entry: './src/index.tsx',
     output: {
         filename: 'bundle.js',

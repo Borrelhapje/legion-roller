@@ -57,7 +57,7 @@ const Application = ({ files }: { files: Song[] }) => {
             </tr>)}
             </table></div>
         <audio controls src={`${prefix}${encodeURI(playlist.at(current)?.total) ?? ''}`} autoPlay onEnded={(e) => setCurrent(prev => prev + 1)}></audio>
-        <Searcher addToList={(file) => setPlaylist(file)} files={files}></Searcher>
+        <Searcher addToList={(file) => startTransition(() => { setPlaylist(file); setCurrent(0); })} files={files}></Searcher>
     </StrictMode>
 };
 
@@ -79,7 +79,7 @@ const Searcher = ({ addToList, files }: { addToList: Adder, files: Song[] }) => 
             return;
         }
         const newFilter = files.filter(file => {
-            return file.artist.toLowerCase().includes(search) && file.album.toLowerCase().includes(search) && file.name.toLowerCase().includes(search);
+            return file.artist.toLowerCase().includes(search) || file.album.toLowerCase().includes(search) || file.name.toLowerCase().includes(search);
         });
         newFilter.sort();
         setFilteredFiles(newFilter);
@@ -87,7 +87,7 @@ const Searcher = ({ addToList, files }: { addToList: Adder, files: Song[] }) => 
     return <>
         <div>
             <label htmlFor='search'>Artist</label>
-            <input type='text' id='searcj' value={search} onChange={(e) => setSearch(e.target.value)}></input>
+            <input type='text' id='searcj' value={search} onChange={(e) => startTransition(() => setSearch(e.target.value))}></input>
         </div>
         <div>
             <SearchResults songs={filteredFiles} addToList={addToList}></SearchResults>
@@ -95,52 +95,59 @@ const Searcher = ({ addToList, files }: { addToList: Adder, files: Song[] }) => 
     </>
 }
 
-const SearchResults = ({ songs, addToList }: { songs: Song[], addToList: Adder }) => {
-    const artists = useMemo(() => groupBy(songs, s => s.artist), [songs]);
-    const albums = useMemo(() => groupBy(songs, s => s.album), [songs]);
-    const names = useMemo(() => groupBy(songs, s => s.name), [songs]);
-    const artistNodes: JSX.Element[] = [];
-    for (const [key, value] of artists.entries()) {
-        artistNodes.push(<div key={key} className={styles.horizontalBar}>
-            {key}
-            <button onClick={(e) => addToList(shuffle(value))}>Play all</button>
-        </div>);
+interface TreeNode {
+    name: string,
+    nodes: Map<string, TreeNode>,
+    song?: Song
+}
+
+const recursiveAllSongs = (arg0: TreeNode) => { 
+    const result: Song[] = [];
+    if (arg0.song) {
+        result.push(arg0.song);
     }
-    const albumNodes: JSX.Element[] = [];
-    for (const [key, value] of albums.entries()) {
-        albumNodes.push(<div key={key} className={styles.horizontalBar}>
-            {key}
-            <button onClick={(e) => addToList(shuffle(value))}>Play</button>
-        </div>);
+    for (const node of arg0.nodes.values()) {
+        result.push(...recursiveAllSongs(node));
     }
-    const nameNodes: JSX.Element[] = [];
-    for (const [key, value] of names.entries()) {
-        nameNodes.push(<div key={key} className={styles.horizontalBar}>
-            {key}
-            <button onClick={(e) => addToList(shuffle(value))}>Play</button>
-        </div>);
-    }
-    return <>
-        <div className={styles.horizontalBar}>
-            Artists
-            {artistNodes}
-        </div>
-        <div className={styles.horizontalBar}>
-            Albums
-            {albumNodes}
-        </div>
-    </>;
+    return result;
 };
 
-function groupBy<K, V>(items: V[], grouper: (arg0: V) => K): Map<K, V[]> {
-    const result = new Map<K, V[]>();
-    items.forEach(item => {
-        const key = grouper(item);
-        const value = result.get(key) ?? [];
-        value.push(item);
-        result.set(key, value);
-    })
-    return result;
+const SearchResults = ({ songs, addToList }: { songs: Song[], addToList: Adder }) => {
+    const artists = useMemo(() => {
+        const result: Map<string,TreeNode> = new Map();
+        songs.forEach(s => {
+            const artistNode = result.get(s.artist) ?? { name: s.artist, nodes: new Map<string, TreeNode>() };
+            result.set(artistNode.name, artistNode);
+            const albumNode = artistNode.nodes.get(s.album) ?? { name: s.album, nodes: new Map<string, TreeNode>() };
+            artistNode.nodes.set(albumNode.name, albumNode);
+            albumNode.nodes.set(s.name, { name: s.name, nodes: new Map(), song: s });
+        });
+        return result;
+    }, [songs]);
+    return <ul>
+        <RenderTree node={{ name: '', nodes: artists }} addToList={addToList}/>
+    </ul>;
+};
+
+const RenderTree = ({ node, addToList }: { node: TreeNode, addToList: Adder }) => {
+    const [ulOpen, setUlOpen] = useState(false);
+    useEffect(() => {
+        setUlOpen(node.nodes.size <= 3);
+    }, [node.nodes]);
+    const list: TreeNode[] = [];
+    for (const value of node.nodes.values()) {
+        list.push(value);
+    }
+    list.sort((a, b) => a.name.localeCompare(b.name));
+    return <li>
+        <span className={list.length === 0 ? '' : styles.caret}
+            onClick={(e) => setUlOpen(prev => !prev)}>
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(shuffle(recursiveAllSongs(node))) }}>{node.name}</button>
+        </span>
+        <ul className={`${styles.nested} ${ulOpen ? styles.active : ''}`} >
+            {list.map(node => <RenderTree node={node} addToList={addToList} />)}
+        </ul>
+    </li>
 }
 
 function shuffle<T>(items: T[]): T[] {
