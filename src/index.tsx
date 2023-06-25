@@ -33,7 +33,7 @@ loadDir(prefix)
         const parsed = files.filter(file => file.endsWith('.flac') || file.endsWith('.mp3'))
             .map(file => {
                 const withoutPrefix = file.substring(prefix.length);
-                const [fileArtist, fileAlbum, fileName] = decodeURI(decodeURI(withoutPrefix)).split("/", 3);
+                const [fileArtist, fileAlbum, fileName] = decodeURIComponent(withoutPrefix).split("/", 3);
             const name = fileName.substring(0, fileName.lastIndexOf('.'));
             const s: Song = { name: name, album: fileAlbum, artist: fileArtist, total: withoutPrefix };
             return s;
@@ -86,8 +86,7 @@ const Searcher = ({ addToList, files }: { addToList: Adder, files: Song[] }) => 
     }, [search, files]);
     return <>
         <div>
-            <label htmlFor='search'>Artist</label>
-            <input type='text' id='searcj' value={search} onChange={(e) => startTransition(() => setSearch(e.target.value))}></input>
+            <input type='text' placeholder='search' value={search} onChange={(e) => setSearch(e.target.value)}></input>
         </div>
         <div>
             <SearchResults songs={filteredFiles} addToList={addToList}></SearchResults>
