@@ -76,11 +76,22 @@ const Application = ({ files }: { files: Song[] }) => {
             </tr>)}
             </table></div>
         <audio controls src={`${prefix}${playlist.at(current)?.total ?? ''}`} autoPlay onEnded={(e) => setCurrent(prev => prev + 1)}></audio>
-        <Searcher addToList={(file) => startTransition(() => { setPlaylist(file); setCurrent(0); })} files={files}></Searcher>
+        <Searcher addToList={(file, append) => startTransition(() => {
+            if (append) {
+                setPlaylist(prev => {
+                    const copy = [...prev]
+                    copy.splice(current + 1, 0, ...file);
+                    return copy;
+                });
+            } else {
+                setPlaylist(file);
+                setCurrent(0);
+            }
+        })} files={files}></Searcher>
     </StrictMode>
 };
 
-type Adder = (file: Song[]) => void
+type Adder = (file: Song[], append: boolean) => void
 
 interface Song {
     name: string,
@@ -158,11 +169,17 @@ const RenderTree = ({ node, addToList }: { node: TreeNode, addToList: Adder }) =
         list.push(value);
     }
     list.sort((a, b) => a.name.localeCompare(b.name));
+    const songNum = useMemo(() => recursiveAllSongs(node).length, [node]);
     return <li>
         <span className={list.length === 0 ? '' : styles.caret}
             onClick={(e) => setUlOpen(prev => !prev)}>
-            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(shuffle(recursiveAllSongs(node))) }}>Play {node.name}</button>
-            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(recursiveAllSongs(node)) }}>Play in order {node.name}</button>
+            {songNum === 1 ? <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(recursiveAllSongs(node), true) }}>Play next {node.name}</button>
+                :
+                <>
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(shuffle(recursiveAllSongs(node)), false) }}>Play {node.name}</button>
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(recursiveAllSongs(node), false) }}>Play in order {node.name}</button>
+                </>
+            }
         </span>
         <ul className={`${styles.nested} ${ulOpen ? styles.active : ''}`} >
             {list.map(node => <RenderTree node={node} addToList={addToList} />)}
