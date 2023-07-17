@@ -44,12 +44,30 @@ loadDir(prefix)
 const Application = ({ files }: { files: Song[] }) => {
     const [playlist, setPlaylist] = useState<Song[]>(files.slice(0, 300));
     const [current, setCurrent] = useState<number>(0);
+    useEffect(() => { 
+        document.title = "Music " + playlist.at(current)?.name;
+    }, [current, playlist]);
     return <StrictMode>
         <button onClick={(e) => setPlaylist(shuffle(files).slice(0,300))}>Play random</button>
         <div style={{maxHeight: '500px', display: 'flex', overflow: 'scroll'}}>
             <table style={{ maxHeight: '500px'}}>
                 {playlist.map((song, index) => <tr key={song.total}
-                    onClick={(e) => setCurrent(index)} style={{ cursor: 'pointer' }}>
+                    onClick={(e) => setCurrent(index)} style={{ cursor: 'pointer' }}
+                    draggable
+                    onDragStart={(e) => {
+                        e.dataTransfer.setData("song", index.toString(10));
+                        e.dataTransfer.dropEffect = "move";
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                        const oldIndex = parseInt(e.dataTransfer.getData("song"), 10);
+                        setPlaylist(prev => {
+                            const copy = [...prev];
+                            copy.splice(oldIndex > index ? index : index + 1, 0, copy.at(oldIndex));
+                            copy.splice(oldIndex > index ? oldIndex + 1 : oldIndex, 1);
+                            return copy;
+                        });
+                     }}>
                 <td>{index == current ? '>' : ''}</td>
                     <td>{song.artist}</td>
                     <td>{song.album}</td>
