@@ -46,9 +46,10 @@ const Application = ({ files }: { files: Song[] }) => {
     const [current, setCurrent] = useState<number>(0);
     return <StrictMode>
         <button onClick={(e) => setPlaylist(shuffle(files).slice(0,300))}>Play random</button>
-        <div style={{height: '500px', display: 'flex', overflow: 'scroll'}}>
-        <table style={{height: '500px'}}>
-                {playlist.map((song, index) => <tr key={song.total} onClick={(e) => setCurrent(index)} style={{ cursor: 'pointer'}}>
+        <div style={{maxHeight: '500px', display: 'flex', overflow: 'scroll'}}>
+            <table style={{ maxHeight: '500px'}}>
+                {playlist.map((song, index) => <tr key={song.total}
+                    onClick={(e) => setCurrent(index)} style={{ cursor: 'pointer' }}>
                 <td>{index == current ? '>' : ''}</td>
                     <td>{song.artist}</td>
                     <td>{song.album}</td>
@@ -108,6 +109,7 @@ const recursiveAllSongs = (arg0: TreeNode) => {
     for (const node of arg0.nodes.values()) {
         result.push(...recursiveAllSongs(node));
     }
+    result.sort((a,b) => a.total.localeCompare(b.total))
     return result;
 };
 
