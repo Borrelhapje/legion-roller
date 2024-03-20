@@ -2,56 +2,25 @@ import { StrictMode, startTransition, useEffect, useMemo, useState } from 'react
 import { createRoot } from 'react-dom/client';
 import styles from './style.module.css';
 
-const prefix = '/complete/music/';
-
-async function loadDir(path: string): Promise<string[]> {
-    const call = await fetch(path);
-    const html = await call.text();
-    const dom = new DOMParser().parseFromString(html, "text/html");
-    const items = dom.querySelectorAll("a");
-    const result: string[] = [];
-    const promises: Promise<any>[] = [];
-    for (let i = 0; i < items.length; i++) {
-        const link = path + items.item(i).getAttribute('href');
-        if (link.endsWith("../")) {
-            continue;
-        }
-        if (link.endsWith('/')) {
-            promises.push(loadDir(link).then(v => result.push(...v)));
-        } else {
-            result.push(link);
-        }
-    }
-    await Promise.all(promises);
-    return result;
-}
-
-loadDir(prefix)
-    .then(files => {
+fetch('/list')
+    .then(r => r.json())
+    .then(songs => {
         const div = document.createElement('div');
         document.body.appendChild(div);
-        const parsed = files.filter(file => file.endsWith('.flac') || file.endsWith('.mp3'))
-            .map(file => {
-                const withoutPrefix = file.substring(prefix.length);
-                const [fileArtist, fileAlbum, fileName] = decodeURIComponent(withoutPrefix).split("/", 3);
-            const name = fileName.substring(0, fileName.lastIndexOf('.'));
-            const s: Song = { name: name, album: fileAlbum, artist: fileArtist, total: withoutPrefix };
-            return s;
-        });
-        createRoot(div).render(<Application files={shuffle(parsed)} />);
+        createRoot(div).render(<Application files={shuffle(songs as Song[])} />);
     });
 
 const Application = ({ files }: { files: Song[] }) => {
     const [playlist, setPlaylist] = useState<Song[]>(files.slice(0, 300));
     const [current, setCurrent] = useState<number>(0);
     useEffect(() => { 
-        document.title = "Music " + playlist.at(current)?.name;
+        document.title = "Music " + playlist.at(current)?.Title;
     }, [current, playlist]);
     return <StrictMode>
         <button onClick={(e) => setPlaylist(shuffle(files).slice(0,300))}>Play random</button>
         <div style={{maxHeight: '500px', display: 'flex', overflow: 'scroll'}}>
             <table style={{ maxHeight: '500px'}}>
-                {playlist.map((song, index) => <tr key={song.total}
+                {playlist.map((song, index) => <tr key={song.Id}
                     onClick={(e) => setCurrent(index)} style={{ cursor: 'pointer' }}
                     draggable
                     onDragStart={(e) => {
@@ -69,13 +38,13 @@ const Application = ({ files }: { files: Song[] }) => {
                         });
                      }}>
                 <td>{index == current ? '>' : ''}</td>
-                    <td>{song.artist}</td>
-                    <td>{song.album}</td>
-                    <td>{song.name}</td>
-                    <td onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPlaylist(prev => prev.filter(s => s.total !== song.total)) }}>X</td>
+                    <td>{song.Artist}</td>
+                    <td>{song.Album}</td>
+                    <td>{song.Title}</td>
+                    <td onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPlaylist(prev => prev.filter(s => s.Id !== song.Id)) }}>X</td>
             </tr>)}
             </table></div>
-        <audio controls src={`${prefix}${playlist.at(current)?.total ?? ''}`} autoPlay onEnded={(e) => setCurrent(prev => prev + 1)}></audio>
+        <audio controls src={`${playlist.at(current)?.Path ?? ''}`} autoPlay onEnded={(e) => setCurrent(prev => prev + 1)}></audio>
         <Searcher addToList={(file, append) => startTransition(() => {
             if (append) {
                 setPlaylist(prev => {
@@ -94,10 +63,12 @@ const Application = ({ files }: { files: Song[] }) => {
 type Adder = (file: Song[], append: boolean) => void
 
 interface Song {
-    name: string,
-    album: string,
-    artist: string,
-    total: string
+    Id: number,
+    Title: string,
+    Album: string,
+    Artist: string,
+    Path: string
+    EpochMillis: number
 }
 
 const Searcher = ({ addToList, files }: { addToList: Adder, files: Song[] }) => {
@@ -109,7 +80,7 @@ const Searcher = ({ addToList, files }: { addToList: Adder, files: Song[] }) => 
             return;
         }
         const newFilter = files.filter(file => {
-            return file.artist.toLowerCase().includes(search) || file.album.toLowerCase().includes(search) || file.name.toLowerCase().includes(search);
+            return file.Artist.toLowerCase().includes(search) || file.Album.toLowerCase().includes(search) || file.Title.toLowerCase().includes(search);
         });
         newFilter.sort();
         setFilteredFiles(newFilter);
@@ -138,7 +109,7 @@ const recursiveAllSongs = (arg0: TreeNode) => {
     for (const node of arg0.nodes.values()) {
         result.push(...recursiveAllSongs(node));
     }
-    result.sort((a,b) => a.total.localeCompare(b.total))
+    result.sort((a,b) => a.Id - b.Id)
     return result;
 };
 
@@ -146,11 +117,11 @@ const SearchResults = ({ songs, addToList }: { songs: Song[], addToList: Adder }
     const artists = useMemo(() => {
         const result: Map<string,TreeNode> = new Map();
         songs.forEach(s => {
-            const artistNode = result.get(s.artist) ?? { name: s.artist, nodes: new Map<string, TreeNode>() };
+            const artistNode = result.get(s.Artist) ?? { name: s.Artist, nodes: new Map<string, TreeNode>() };
             result.set(artistNode.name, artistNode);
-            const albumNode = artistNode.nodes.get(s.album) ?? { name: s.album, nodes: new Map<string, TreeNode>() };
+            const albumNode = artistNode.nodes.get(s.Album) ?? { name: s.Album, nodes: new Map<string, TreeNode>() };
             artistNode.nodes.set(albumNode.name, albumNode);
-            albumNode.nodes.set(s.name, { name: s.name, nodes: new Map(), song: s });
+            albumNode.nodes.set(s.Title, { name: s.Title, nodes: new Map(), song: s });
         });
         return result;
     }, [songs]);

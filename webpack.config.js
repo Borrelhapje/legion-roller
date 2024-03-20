@@ -13,6 +13,10 @@ export default {
             '/complete': {
                 target: 'https://media.helderman.xyz',
                 changeOrigin: true
+            },
+            '/list': {
+                target: 'https://media.helderman.xyz',
+                changeOrigin: true
             }
         }
     },
