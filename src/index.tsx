@@ -2,170 +2,179 @@ import { StrictMode, startTransition, useEffect, useMemo, useState } from 'react
 import { createRoot } from 'react-dom/client';
 import styles from './style.module.css';
 
-fetch('/list')
-    .then(r => r.json())
-    .then(songs => {
         const div = document.createElement('div');
         document.body.appendChild(div);
-        createRoot(div).render(<Application files={shuffle(songs as Song[])} />);
-    });
+        createRoot(div).render(<div></div>);
 
-const Application = ({ files }: { files: Song[] }) => {
-    const [playlist, setPlaylist] = useState<Song[]>(files.slice(0, 300));
-    const [current, setCurrent] = useState<number>(0);
-    useEffect(() => { 
-        document.title = "Music " + playlist.at(current)?.Title;
-    }, [current, playlist]);
-    return <StrictMode>
-        <button onClick={(e) => setPlaylist(shuffle(files).slice(0,300))}>Play random</button>
-        <div style={{maxHeight: '500px', display: 'flex', overflow: 'scroll'}}>
-            <table style={{ maxHeight: '500px'}}>
-                {playlist.map((song, index) => <tr key={song.Id}
-                    onClick={(e) => setCurrent(index)} style={{ cursor: 'pointer' }}
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData("song", index.toString(10));
-                        e.dataTransfer.dropEffect = "move";
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                        const oldIndex = parseInt(e.dataTransfer.getData("song"), 10);
-                        setPlaylist(prev => {
-                            const copy = [...prev];
-                            copy.splice(oldIndex > index ? index : index + 1, 0, copy.at(oldIndex));
-                            copy.splice(oldIndex > index ? oldIndex + 1 : oldIndex, 1);
-                            return copy;
-                        });
-                     }}>
-                <td>{index == current ? '>' : ''}</td>
-                    <td>{song.Artist}</td>
-                    <td>{song.Album}</td>
-                    <td>{song.Title}</td>
-                    <td onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPlaylist(prev => prev.filter(s => s.Id !== song.Id)) }}>X</td>
-            </tr>)}
-            </table></div>
-        <audio controls src={`${playlist.at(current)?.Path ?? ''}`} autoPlay onEnded={(e) => setCurrent(prev => prev + 1)}></audio>
-        <Searcher addToList={(file, append) => startTransition(() => {
-            if (append) {
-                setPlaylist(prev => {
-                    const copy = [...prev]
-                    copy.splice(current + 1, 0, ...file);
-                    return copy;
-                });
-            } else {
-                setPlaylist(file);
-                setCurrent(0);
-            }
-        })} files={files}></Searcher>
-    </StrictMode>
-};
-
-type Adder = (file: Song[], append: boolean) => void
-
-interface Song {
-    Id: number,
-    Title: string,
-    Album: string,
-    Artist: string,
-    Path: string
-    EpochMillis: number
+interface AtkRoll {
+    miss: number,
+    hits: number,
+    crits: number,
+    surges: number
 }
 
-const Searcher = ({ addToList, files }: { addToList: Adder, files: Song[] }) => {
-    const [search, setSearch] = useState(''); 
-    const [filteredFiles, setFilteredFiles] = useState<Song[]>([]);
-    useEffect(() => {
-        if (search === '') {
-            setFilteredFiles([]);
-            return;
+interface DefRoll {
+    miss: number,
+    blocks: number,
+    surges: number
+}
+
+enum AtkSurge {None, Hit, Crit}
+
+interface RollConfig {
+    redAtk: number,
+    blackAtk: number,
+    whiteAtk: number,
+    atkSurge: AtkSurge,
+    critical: number,
+    atkSurges: number,
+
+
+    defDice: boolean,
+    defSurge: boolean
+}
+
+const SingleRoll : (r : RollConfig) => number = (r) =>  {
+    const redRoll = E(r.redAtk, AtkDice.Red);
+    const blackRoll = E(r.blackAtk, AtkDice.Black);
+    const whiteRoll = E(r.whiteAtk, AtkDice.White);
+    //losse dice types zijn belangrijk voor aims, verder niet
+
+    const totalAtkRoll : AtkRoll = {
+        crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
+        hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
+        miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
+        surges: redRoll.surges + blackRoll.surges + whiteRoll.surges,
+    };
+    const afterCritical = criticalFilter(r, totalAtkRoll);
+    const afterSurgeToken = surgeTokenAtkFilter(r, afterCritical);
+    const afterSurge = surgeConversionAtk(r, afterSurgeToken);
+
+    const rollDefDice = defDice(afterSurge.crits + afterSurge.hits, r.defDice);
+    const afterDefSurge = surgeConversionDef(r, rollDefDice);
+
+    return afterSurge.crits + afterSurge.hits - afterDefSurge.blocks;
+};
+
+
+
+type AttackFilter = (r: RollConfig, a: AtkRoll) => AtkRoll;
+
+const criticalFilter = (r: RollConfig, a: AtkRoll) => {
+    if (r.critical === 0 || a.surges === 0) {
+        return a;
+    }
+    const copy = {...a};
+    if (r.critical >= a.surges) {
+        copy.crits += a.surges;
+        copy.surges = 0;
+    } else {
+        copy.crits += r.critical;
+        copy.surges -= r.critical;
+    }
+    return copy;
+}
+
+const surgeTokenAtkFilter = (r: RollConfig, a: AtkRoll) => {
+    if (r.atkSurges === 0 || a.surges === 0) {
+        return a;
+    }
+    const copy = {...a};
+    if (r.atkSurges >= a.surges) {
+        copy.hits += a.surges;
+        copy.surges = 0;
+    } else {
+        copy.hits += r.atkSurges;
+        copy.surges -= r.atkSurges;
+    }
+    return copy;
+}
+
+const surgeConversionAtk = (r: RollConfig, a: AtkRoll) => {
+    const copy = {...a};
+    switch (r.atkSurge) {
+        case AtkSurge.None:
+            copy.miss += copy.surges;
+            copy.surges = 0;
+            break;
+        case AtkSurge.Hit:
+            copy.hits += copy.surges;
+            copy.surges = 0;
+            break;
+        case AtkSurge.Crit:
+            copy.crits += copy.surges;
+            copy.surges = 0;
+            break;
+    }
+    return copy;
+}
+
+const surgeConversionDef = (r: RollConfig, a: DefRoll) => {
+    const copy = {...a};
+    if (r.defSurge) {
+        copy.blocks += copy.surges;
+        copy.surges = 0;
+    }
+    return copy;
+}
+
+enum AtkDice { Red, Black, White};
+
+const E = (i: number, tp: AtkDice) => {
+    const result: AtkRoll = {
+        crits: 0,
+        hits: 0,
+        miss: 0,
+        surges: 0
+    }
+    let hitCount = 0;
+    switch (tp) {
+        case AtkDice.Red:
+            hitCount = 5;
+            break;
+        case AtkDice.Black:
+            hitCount = 3;
+            break;
+        case AtkDice.White:
+            hitCount = 1;
+            break;
+    }
+    for (const x =0 ; x < i ; i++) {
+        const r = R(8);
+        if (r < hitCount){
+            result.hits++;
+        } else if (r < hitCount + 1) {
+            result.crits++;
+        } else if (r < hitCount + 2) {
+            result.surges++;
+        } else {
+            result.miss++;
         }
-        const newFilter = files.filter(file => {
-            return file.Artist.toLowerCase().includes(search) || file.Album.toLowerCase().includes(search) || file.Title.toLowerCase().includes(search);
-        });
-        newFilter.sort();
-        setFilteredFiles(newFilter);
-    }, [search, files]);
-    return <>
-        <div>
-            <input type='text' placeholder='search' value={search} onChange={(e) => setSearch(e.target.value)}></input>
-        </div>
-        <div>
-            <SearchResults songs={filteredFiles} addToList={addToList}></SearchResults>
-        </div>
-    </>
-}
-
-interface TreeNode {
-    name: string,
-    nodes: Map<string, TreeNode>,
-    song?: Song
-}
-
-const recursiveAllSongs = (arg0: TreeNode) => { 
-    const result: Song[] = [];
-    if (arg0.song) {
-        result.push(arg0.song);
     }
-    for (const node of arg0.nodes.values()) {
-        result.push(...recursiveAllSongs(node));
-    }
-    result.sort((a,b) => a.Id - b.Id)
     return result;
-};
-
-const SearchResults = ({ songs, addToList }: { songs: Song[], addToList: Adder }) => {
-    const artists = useMemo(() => {
-        const result: Map<string,TreeNode> = new Map();
-        songs.forEach(s => {
-            const artistNode = result.get(s.Artist) ?? { name: s.Artist, nodes: new Map<string, TreeNode>() };
-            result.set(artistNode.name, artistNode);
-            const albumNode = artistNode.nodes.get(s.Album) ?? { name: s.Album, nodes: new Map<string, TreeNode>() };
-            artistNode.nodes.set(albumNode.name, albumNode);
-            albumNode.nodes.set(s.Title, { name: s.Title, nodes: new Map(), song: s });
-        });
-        return result;
-    }, [songs]);
-    return <ul>
-        <RenderTree node={{ name: '', nodes: artists }} addToList={addToList}/>
-    </ul>;
-};
-
-const RenderTree = ({ node, addToList }: { node: TreeNode, addToList: Adder }) => {
-    const [ulOpen, setUlOpen] = useState(false);
-    useEffect(() => {
-        setUlOpen(node.nodes.size <= 3);
-    }, [node.nodes]);
-    const list: TreeNode[] = [];
-    for (const value of node.nodes.values()) {
-        list.push(value);
-    }
-    list.sort((a, b) => a.name.localeCompare(b.name));
-    const songNum = useMemo(() => recursiveAllSongs(node).length, [node]);
-    return <li>
-        <span className={list.length === 0 ? '' : styles.caret}
-            onClick={(e) => setUlOpen(prev => !prev)}>
-            {songNum === 1 ? <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(recursiveAllSongs(node), true) }}>Play next {node.name}</button>
-                :
-                <>
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(shuffle(recursiveAllSongs(node)), false) }}>Play {node.name}</button>
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToList(recursiveAllSongs(node), false) }}>Play in order {node.name}</button>
-                </>
-            }
-        </span>
-        <ul className={`${styles.nested} ${ulOpen ? styles.active : ''}`} >
-            {list.map(node => <RenderTree node={node} addToList={addToList} />)}
-        </ul>
-    </li>
 }
 
-function shuffle<T>(items: T[]): T[] {
-    for (let i = items.length - 1; i > 0; i--)
-    {
-        const n = Math.floor(Math.random() * (i+1));
-        const toSwap = items.at(i);
-        const other = items.at(n);
-        items[i] = other;
-        items[n] = toSwap;
+const defDice = (i: number, tp: boolean) => {
+    const result: DefRoll = {
+        blocks: 0,
+        miss: 0,
+        surges: 0
     }
-    return items;
+    const hitCount =  tp ? 3 : 1;
+    for (const x =0 ; x < i ; i++) {
+        const r = R(6);
+        if (r < hitCount){
+            result.blocks++;
+        } else if (r < hitCount + 1) {
+            result.surges++;
+        } else {
+            result.miss++;
+        }
+    }
+    return result;
 }
+
+const R : (limit: number) => number = (l) =>  {
+    const n = Math.floor(Math.random() * l);
+    return n;
+};

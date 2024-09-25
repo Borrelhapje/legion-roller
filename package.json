@@ -1,5 +1,5 @@
 {
-  "name": "music-frontend",
+  "name": "legion-roller",
   "version": "1.0.0",
   "description": "",
   "main": "index.tsx",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "github.com/Borrelhapje/music-frontend"
+    "url": "github.com/Borrelhapje/legion-roller"
   },
   "author": "",
   "license": "ISC",
