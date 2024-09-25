@@ -1,12 +1,14 @@
 import { StrictMode, startTransition, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import styles from './style.module.css';
 
         const div = document.createElement('div');
         document.body.appendChild(div);
-        createRoot(div).render(<div></div>);
+        createRoot(div).render(<App/>);
 
-interface AtkRoll {
+
+
+
+        interface AtkRoll {
     miss: number,
     hits: number,
     crits: number,
@@ -310,4 +312,36 @@ const defDice = (i: number, tp: boolean) => {
 const R : (limit: number) => number = (l) =>  {
     const n = Math.floor(Math.random() * l);
     return n;
+};
+
+
+function App() {
+    const [config, setConfig] = useState<RollConfig>({
+        armor:0,
+        atkSurge: AtkSurge.None,
+        atkSurges: 0,
+        blackAtk: 0,
+        blast: false,
+        cover: 0,
+        critical: 0,
+        dangerSense: 0,
+        defDice: false,
+        defSurge: false,
+        defSurgeTokens: 0,
+        dodges: 0,
+        highVelocity: false,
+        impact: 0,
+        impervious: false,
+        lowProfile: false,
+        pierce: 0,
+        ram: 0,
+        redAtk: 3,
+        sharpShooter: 0,
+        shields: 0,
+        whiteAtk: 0
+    });
+    return <div>
+        <div className="config"></div>
+        <div className="results"></div>
+    </div>;
 };
