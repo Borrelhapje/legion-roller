@@ -23,32 +23,6 @@ interface DefRoll {
 
 enum AtkSurge {None, Hit, Crit}
 
-interface RollConfig {
-    redAtk: number,
-    blackAtk: number,
-    whiteAtk: number,
-    atkSurge: AtkSurge,
-    critical: number,
-    atkSurges: number,
-    sharpShooter: 0 | 1 |2,
-    blast: boolean,
-    highVelocity: boolean,
-    ram: number,
-    impact: number,
-    pierce: number,
-
-    cover: 0 | 1| 2,
-    lowProfile: boolean,
-    shields: number,
-    dodges: number,
-    armor: 0| 1|2|3|4|5,
-    defDice: boolean,
-    defSurge: boolean,
-    defSurgeTokens: number,
-    dangerSense: number,
-    impervious: boolean,
-}
-
 const SingleRoll : (r : RollConfig) => number = (r) =>  {
     const redRoll = E(r.redAtk, AtkDice.Red);
     const blackRoll = E(r.blackAtk, AtkDice.Black);
@@ -92,7 +66,7 @@ const coverFilter: AttackFilter = (r,a ) => {
     if (a.hits === 0) {
         return a;
     }
-    const toRoll = (a.hits) - (r.lowProfile ? 1 : 0);
+    const toRoll = a.hits - (r.lowProfile ? 1 : 0);
     const roll = defDice(toRoll, false);
     if (c === 1) {
         return {...a, hits: a.hits - roll.blocks};
@@ -112,7 +86,7 @@ const shieldFilter: AttackFilter = (r,a) => {
             copy.hits -= remainingShields;
         }
     } else {
-        copy.crits = 0;
+        copy.crits -= remainingShields;
     }
     return copy;
 }
@@ -255,7 +229,7 @@ const pierceDef: DefFilter = (r,a) => {
 
 enum AtkDice { Red, Black, White};
 
-const E = (i: number, tp: AtkDice) => {
+const E = (x: number, tp: AtkDice) => {
     const result: AtkRoll = {
         crits: 0,
         hits: 0,
@@ -274,7 +248,7 @@ const E = (i: number, tp: AtkDice) => {
             hitCount = 1;
             break;
     }
-    for (const x =0 ; x < i ; i++) {
+    for (let i =0 ; i < x ; i++) {
         const r = R(8);
         if (r < hitCount){
             result.hits++;
@@ -289,14 +263,14 @@ const E = (i: number, tp: AtkDice) => {
     return result;
 }
 
-const defDice = (i: number, tp: boolean) => {
+const defDice = (x: number, tp: boolean) => {
     const result: DefRoll = {
         blocks: 0,
         miss: 0,
         surges: 0
     }
     const hitCount =  tp ? 3 : 1;
-    for (const x =0 ; x < i ; i++) {
+    for (let i = 0 ; i < x ; i++) {
         const r = R(6);
         if (r < hitCount){
             result.blocks++;
@@ -314,6 +288,37 @@ const R : (limit: number) => number = (l) =>  {
     return n;
 };
 
+const summarize = (r : number[]) => {
+    const total = r.reduce((prev, current) => prev + current, 0);
+    const average = total / (Math.max(r.length, 1));
+    return average;
+};
+
+interface RollConfig {
+    redAtk: number,
+    blackAtk: number,
+    whiteAtk: number,
+    atkSurge: AtkSurge,
+    critical: number,
+    atkSurges: number,
+    sharpShooter: 0 | 1 |2,
+    blast: boolean,
+    highVelocity: boolean,
+    ram: number,
+    impact: number,
+    pierce: number,
+
+    cover: 0 | 1| 2,
+    lowProfile: boolean,
+    shields: number,
+    dodges: number,
+    armor: 0| 1|2|3|4|5,
+    defDice: boolean,
+    defSurge: boolean,
+    defSurgeTokens: number,
+    dangerSense: number,
+    impervious: boolean,
+}
 
 function App() {
     const [config, setConfig] = useState<RollConfig>({
@@ -340,8 +345,38 @@ function App() {
         shields: 0,
         whiteAtk: 0
     });
+    const [result, setResult] = useState<number[]>([]);
+    const summarized = useMemo(() => summarize(result), [result]);
     return <div>
-        <div className="config"></div>
-        <div className="results"></div>
+        <div className="config">
+            <div>
+            <label htmlFor="redAtk">Red</label>
+            <input id="redAtk" type="number" min="0" max="50" value={config.redAtk} onChange={(e) => setConfig(prev => {return {...prev, redAtk: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber}})}/>
+            <label htmlFor="blackAtk">Black</label>
+            <input id="blackAtk" type="number" min="0" max="50" value={config.blackAtk} onChange={(e) => setConfig(prev => {return {...prev, blackAtk: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber}})}/>
+            <label htmlFor="whiteAtk">White</label>
+            <input id="whiteAtk" type="number" min="0" max="50" value={config.whiteAtk} onChange={(e) => setConfig(prev => {return {...prev, whiteAtk: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber}})}/>
+            </div>
+            <div>
+                <label htmlFor="atkSurge">Convert surges to</label>
+                <select id="atkSurge">
+                    <option value="None" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.None}})}>None</option>
+                    <option value="Hit" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.Hit}})}>Hit</option>
+                    <option value="Crit" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.Crit}})}>Crit</option>
+                </select>
+            </div>
+        </div>
+        <button onClick={(e) => {
+            const results: number[] = [];
+            for (let i = 0; i< 10000; i++){
+                results.push(SingleRoll(config));
+            }
+            setResult(results);
+        }}>Roll</button>
+        <div className="results">
+            {summarized}
+        </div>
     </div>;
 };
+
+
