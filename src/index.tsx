@@ -1,14 +1,15 @@
 import { StrictMode, startTransition, useEffect, useId, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import styles from "./style.module.css";
 
-        const div = document.createElement('div');
-        document.body.appendChild(div);
-        createRoot(div).render(<App/>);
+const div = document.createElement('div');
+document.body.appendChild(div);
+createRoot(div).render(<App />);
 
 
 
 
-        interface AtkRoll {
+interface AtkRoll {
     miss: number,
     hits: number,
     crits: number,
@@ -21,15 +22,15 @@ interface DefRoll {
     surges: number
 }
 
-enum AtkSurge {None, Hit, Crit}
+enum AtkSurge { None, Hit, Crit }
 
-const SingleRoll : (r : RollConfig) => number = (r) =>  {
+const SingleRoll: (r: RollConfig) => number = (r) => {
     const redRoll = E(r.redAtk, AtkDice.Red);
     const blackRoll = E(r.blackAtk, AtkDice.Black);
     const whiteRoll = E(r.whiteAtk, AtkDice.White);
     //losse dice types zijn belangrijk voor aims, verder niet
 
-    let roll : AtkRoll = {
+    let roll: AtkRoll = {
         crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
         hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
         miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
@@ -54,7 +55,7 @@ const SingleRoll : (r : RollConfig) => number = (r) =>  {
     return roll.crits + roll.hits - defRoll.blocks;
 };
 
-const coverFilter: AttackFilter = (r,a ) => {
+const coverFilter: AttackFilter = (r, a) => {
     //determine the cover
     if (r.blast) {
         return a;
@@ -72,13 +73,13 @@ const coverFilter: AttackFilter = (r,a ) => {
         roll.blocks++;
     }
     if (c === 1) {
-        return {...a, hits: a.hits - roll.blocks};
+        return { ...a, hits: a.hits - roll.blocks };
     }
-    return {...a, hits: a.hits - roll.blocks - roll.surges};
+    return { ...a, hits: a.hits - roll.blocks - roll.surges };
 };
 
-const shieldFilter: AttackFilter = (r,a) => {
-    const copy = {...a};
+const shieldFilter: AttackFilter = (r, a) => {
+    const copy = { ...a };
     let remainingShields = r.shields;
     if (remainingShields >= a.crits) {
         remainingShields -= copy.crits;
@@ -94,20 +95,20 @@ const shieldFilter: AttackFilter = (r,a) => {
     return copy;
 }
 
-const dodgeFilter: AttackFilter = (r,a) => {
+const dodgeFilter: AttackFilter = (r, a) => {
     if (r.highVelocity) {
         return a;
     }
     if (r.dodges >= a.hits) {
-        return {...a, hits: 0};
+        return { ...a, hits: 0 };
     } else {
-        return {...a, hits: a.hits - r.dodges};
+        return { ...a, hits: a.hits - r.dodges };
     }
 }
 
-const ramFilter: AttackFilter = (r,a) => {
+const ramFilter: AttackFilter = (r, a) => {
     let ramRemaining = r.ram;
-    const copy = {...a};
+    const copy = { ...a };
     if (copy.miss >= ramRemaining) {
         copy.crits += ramRemaining;
         copy.miss -= ramRemaining;
@@ -134,24 +135,24 @@ const ramFilter: AttackFilter = (r,a) => {
     return copy;
 }
 
-const impactFilter: AttackFilter = (r,a) => {
+const impactFilter: AttackFilter = (r, a) => {
     if (r.armor === 0) {
         return a;
     }
     if (a.hits >= r.impact) {
-        return {...a, crits: a.crits + r.impact, hits: a.hits - r.impact};
+        return { ...a, crits: a.crits + r.impact, hits: a.hits - r.impact };
     }
-    return {...a, crits: a.crits + a.hits, hits: 0};
+    return { ...a, crits: a.crits + a.hits, hits: 0 };
 };
 
-const armorFilter: AttackFilter = (r,a) => {
+const armorFilter: AttackFilter = (r, a) => {
     if (r.armor === 0) {
         return a;
     }
     if (a.hits <= r.armor) {
-        return {...a, hits: 0};
+        return { ...a, hits: 0 };
     }
-    return {...a, hits: a.hits - r.armor};
+    return { ...a, hits: a.hits - r.armor };
 };
 
 type AttackFilter = (r: RollConfig, a: AtkRoll) => AtkRoll;
@@ -160,7 +161,7 @@ const criticalFilter: AttackFilter = (r, a) => {
     if (r.critical === 0 || a.surges === 0) {
         return a;
     }
-    const copy = {...a};
+    const copy = { ...a };
     if (r.critical >= a.surges) {
         copy.crits += a.surges;
         copy.surges = 0;
@@ -175,7 +176,7 @@ const surgeTokenAtkFilter: AttackFilter = (r, a) => {
     if (r.atkSurges === 0 || a.surges === 0) {
         return a;
     }
-    const copy = {...a};
+    const copy = { ...a };
     if (r.atkSurges >= a.surges) {
         copy.hits += a.surges;
         copy.surges = 0;
@@ -187,7 +188,7 @@ const surgeTokenAtkFilter: AttackFilter = (r, a) => {
 }
 
 const surgeConversionAtk: AttackFilter = (r, a) => {
-    const copy = {...a};
+    const copy = { ...a };
     switch (r.atkSurge) {
         case AtkSurge.None:
             copy.miss += copy.surges;
@@ -208,7 +209,7 @@ const surgeConversionAtk: AttackFilter = (r, a) => {
 type DefFilter = (r: RollConfig, a: DefRoll) => DefRoll;
 
 const surgeConversionDef: DefFilter = (r, a) => {
-    const copy = {...a};
+    const copy = { ...a };
     if (r.defSurge) {
         copy.blocks += copy.surges;
         copy.surges = 0;
@@ -216,21 +217,21 @@ const surgeConversionDef: DefFilter = (r, a) => {
     return copy;
 }
 
-const surgeTokenDef: DefFilter = (r,a) => {
+const surgeTokenDef: DefFilter = (r, a) => {
     if (r.defSurgeTokens >= a.surges) {
-        return {...a, blocks: a.blocks + a.surges, surges: 0};
+        return { ...a, blocks: a.blocks + a.surges, surges: 0 };
     }
-    return {...a, blocks: a.blocks + r.defSurgeTokens, surges: a.surges - r.defSurgeTokens};
+    return { ...a, blocks: a.blocks + r.defSurgeTokens, surges: a.surges - r.defSurgeTokens };
 };
 
-const pierceDef: DefFilter = (r,a) => {
+const pierceDef: DefFilter = (r, a) => {
     if (a.blocks <= r.pierce) {
-        return {...a, blocks: 0};
+        return { ...a, blocks: 0 };
     }
-    return {...a, blocks: a.blocks - r.pierce};
+    return { ...a, blocks: a.blocks - r.pierce };
 };
 
-enum AtkDice { Red, Black, White};
+enum AtkDice { Red, Black, White };
 
 const E = (x: number, tp: AtkDice) => {
     const result: AtkRoll = {
@@ -251,9 +252,9 @@ const E = (x: number, tp: AtkDice) => {
             hitCount = 1;
             break;
     }
-    for (let i =0 ; i < x ; i++) {
+    for (let i = 0; i < x; i++) {
         const r = R(8);
-        if (r < hitCount){
+        if (r < hitCount) {
             result.hits++;
         } else if (r < hitCount + 1) {
             result.crits++;
@@ -272,10 +273,10 @@ const defDice = (x: number, tp: boolean) => {
         miss: 0,
         surges: 0
     }
-    const hitCount =  tp ? 3 : 1;
-    for (let i = 0 ; i < x ; i++) {
+    const hitCount = tp ? 3 : 1;
+    for (let i = 0; i < x; i++) {
         const r = R(6);
-        if (r < hitCount){
+        if (r < hitCount) {
             result.blocks++;
         } else if (r < hitCount + 1) {
             result.surges++;
@@ -286,12 +287,12 @@ const defDice = (x: number, tp: boolean) => {
     return result;
 }
 
-const R : (limit: number) => number = (l) =>  {
+const R: (limit: number) => number = (l) => {
     const n = Math.floor(Math.random() * l);
     return n;
 };
 
-const summarize = (r : number[]) => {
+const summarize = (r: number[]) => {
     const total = r.reduce((prev, current) => prev + current, 0);
     const average = total / (Math.max(r.length, 1));
     return average;
@@ -325,7 +326,7 @@ interface RollConfig {
 
 function App() {
     const [config, setConfig] = useState<RollConfig>({
-        armor:0,
+        armor: 0,
         atkSurge: AtkSurge.None,
         atkSurges: 0,
         blackAtk: 0,
@@ -351,71 +352,78 @@ function App() {
     const [result, setResult] = useState<number[]>([]);
     const summarized = useMemo(() => summarize(result), [result]);
     return <div>
-        <div className="config">
+        <div className={styles.config}>
             <div>
-            <NumInput v={config.redAtk} setV={(v) => setConfig(prev => {return {...prev, redAtk: v}})} label="Red"/>
-            <NumInput v={config.blackAtk} setV={(v) => setConfig(prev => {return {...prev, blackAtk: v}})} label="Black"/>
-            <NumInput v={config.whiteAtk} setV={(v) => setConfig(prev => {return {...prev, whiteAtk: v}})} label="White"/>
+                <NumInput v={config.redAtk} setV={(v) => setConfig(prev => { return { ...prev, redAtk: v } })} label="Red" />
+                <NumInput v={config.blackAtk} setV={(v) => setConfig(prev => { return { ...prev, blackAtk: v } })} label="Black" />
+                <NumInput v={config.whiteAtk} setV={(v) => setConfig(prev => { return { ...prev, whiteAtk: v } })} label="White" />
             </div>
-            <div id="attack-advanced">
-                <label htmlFor="atkSurge">Convert surges to</label>
-                <select id="atkSurge" onChange={(e) => setConfig(prev => {
-                    let surge: AtkSurge = AtkSurge.None;
-                    switch (e.target.value){
-                        case "0":
-                            surge = AtkSurge.None;
-                            break;
-                        case "1":
-                            surge = AtkSurge.Hit;
-                            break;
-                        case "2":
-                            surge = AtkSurge.Crit;
-                            break;
-                    }
-                    return {...prev, atkSurge: surge};
+            <div id="attack-advanced" style={{ display: "flex", flexDirection: "column", maxWidth: "20vw" }}>
+                <div className={styles.between}>
+                    <label htmlFor="atkSurge">Convert surges to</label>
+                    <select id="atkSurge" onChange={(e) => setConfig(prev => {
+                        let surge: AtkSurge = AtkSurge.None;
+                        switch (e.target.value) {
+                            case "0":
+                                surge = AtkSurge.None;
+                                break;
+                            case "1":
+                                surge = AtkSurge.Hit;
+                                break;
+                            case "2":
+                                surge = AtkSurge.Crit;
+                                break;
+                        }
+                        return { ...prev, atkSurge: surge };
                     })}>
-                    <option value="0">None</option>
-                    <option value="1">Hit</option>
-                    <option value="2">Crit</option>
-                </select>
-                <NumInput v={config.atkSurges} setV={(v) => setConfig(prev => {return {...prev, atkSurges: v}})} label="Surge tokens"/>
-                <NumInput v={config.critical} setV={(v) => setConfig(prev => {return {...prev, critical: v}})} label="Critical X"/>
-                <NumInput v={config.pierce} setV={(v) => setConfig(prev => {return {...prev, pierce: v}})} label="Pierce X"/>
-                <NumInput v={config.impact} setV={(v) => setConfig(prev => {return {...prev, impact: v}})} label="Impact X"/>
-                <NumInput v={config.ram} setV={(v) => setConfig(prev => {return {...prev, ram: v}})} label="Ram X"/>
-                <NumInput v={config.sharpShooter} setV={(v) => setConfig(prev => {return {...prev, sharpShooter: v}})} label="Sharpshooter X"/>
-                <label htmlFor="blast">Blast</label>
-                <input id="blast" type="checkbox" checked={config.blast} onChange={(e) => setConfig(prev => {return {...prev, blast: e.target.checked}})}/>
-                <label htmlFor="highvelocity">High Velocity</label>
-                <input id="highvelocity" type="checkbox" checked={config.highVelocity} onChange={(e) => setConfig(prev => {return {...prev, highVelocity: e.target.checked}})}/>
-            </div>
+                        <option value="0">None</option>
+                        <option value="1">Hit</option>
+                        <option value="2">Crit</option>
+                    </select>
+                </div>
+                <NumInput v={config.atkSurges} setV={(v) => setConfig(prev => { return { ...prev, atkSurges: v } })} label="Surge tokens" />
+                <NumInput v={config.critical} setV={(v) => setConfig(prev => { return { ...prev, critical: v } })} label="Critical X" />
+                <NumInput v={config.pierce} setV={(v) => setConfig(prev => { return { ...prev, pierce: v } })} label="Pierce X" />
+                <NumInput v={config.impact} setV={(v) => setConfig(prev => { return { ...prev, impact: v } })} label="Impact X" />
+                <NumInput v={config.ram} setV={(v) => setConfig(prev => { return { ...prev, ram: v } })} label="Ram X" />
+                <NumInput v={config.sharpShooter} setV={(v) => setConfig(prev => { return { ...prev, sharpShooter: v } })} label="Sharpshooter X" />
+                <div className={styles.between}>
+                    <label htmlFor="blast">Blast</label>
+                    <input id="blast" type="checkbox" checked={config.blast} onChange={(e) => setConfig(prev => { return { ...prev, blast: e.target.checked } })} />
+                </div>                    <div className={styles.between}>
+                    <label htmlFor="highvelocity">High Velocity</label>
+                    <input id="highvelocity" type="checkbox" checked={config.highVelocity} onChange={(e) => setConfig(prev => { return { ...prev, highVelocity: e.target.checked } })} />
+                </div></div>
+            <hr></hr>
             <div id="defense">
-                <label htmlFor="defense-type">Defend with</label>
-                <select id="defense-type" onChange={(e) => {
-                    setConfig(prev => {return {...prev, defDice: e.target.value === "1"}});
-                }}>
-                    <option value="0">White</option>
-                    <option value="1">Red</option>
-                </select>
-                <label htmlFor="def-surge">Convert surges</label>
-                <input id="def-surge" type="checkbox" checked={config.defSurge} onChange={(e) => setConfig(prev => {return {...prev, defSurge: e.target.checked}})}/>
-                <NumInput v={config.dodges} setV={(v) => setConfig(prev => {return {...prev, dodges: v}})} label="Dodge tokens"/>
-                <NumInput v={config.shields} setV={(v) => setConfig(prev => {return {...prev, shields: v}})} label="Shield tokens"/>
-                <NumInput v={config.defSurgeTokens} setV={(v) => setConfig(prev => {return {...prev, defSurgeTokens: v}})} label="Surge tokens"/>
-                <NumInput v={config.cover} setV={(v) => setConfig(prev => {return {...prev, cover: v}})} label="Cover X"/>
-                <NumInput v={config.armor} setV={(v) => setConfig(prev => {return {...prev, armor: v}})} label="Armor X"/>
-                <NumInput v={config.dangerSense} setV={(v) => setConfig(prev => {return {...prev, dangerSense: v}})} label="Danger sense X"/>
+                <div className={styles.between}>
+                    <label htmlFor="defense-type">Defend with</label>
+                    <select id="defense-type" onChange={(e) => {
+                        setConfig(prev => { return { ...prev, defDice: e.target.value === "1" } });
+                    }}>
+                        <option value="0">White</option>
+                        <option value="1">Red</option>
+                    </select>
+                </div>
+                <div className={styles.between}>
+                    <label htmlFor="def-surge">Convert surges</label>
+                    <input id="def-surge" type="checkbox" checked={config.defSurge} onChange={(e) => setConfig(prev => { return { ...prev, defSurge: e.target.checked } })} />
+                </div><NumInput v={config.dodges} setV={(v) => setConfig(prev => { return { ...prev, dodges: v } })} label="Dodge tokens" />
+                <NumInput v={config.shields} setV={(v) => setConfig(prev => { return { ...prev, shields: v } })} label="Shield tokens" />
+                <NumInput v={config.defSurgeTokens} setV={(v) => setConfig(prev => { return { ...prev, defSurgeTokens: v } })} label="Surge tokens" />
+                <NumInput v={config.cover} setV={(v) => setConfig(prev => { return { ...prev, cover: v } })} label="Cover X" />
+                <NumInput v={config.armor} setV={(v) => setConfig(prev => { return { ...prev, armor: v } })} label="Armor X" />
+                <NumInput v={config.dangerSense} setV={(v) => setConfig(prev => { return { ...prev, dangerSense: v } })} label="Danger sense X" />
                 <label htmlFor="low-profile">Low profile</label>
-                <input id="low-profile" type="checkbox" checked={config.lowProfile} onChange={(e) => setConfig(prev => {return {...prev, lowProfile: e.target.checked}})}/>
+                <input id="low-profile" type="checkbox" checked={config.lowProfile} onChange={(e) => setConfig(prev => { return { ...prev, lowProfile: e.target.checked } })} />
                 <label htmlFor="impervious">Impervious</label>
-                <input id="impervious" type="checkbox" checked={config.impervious} onChange={(e) => setConfig(prev => {return {...prev, impervious: e.target.checked}})}/>
-
+                <input id="impervious" type="checkbox" checked={config.impervious} onChange={(e) => setConfig(prev => { return { ...prev, impervious: e.target.checked } })} />
             </div>
         </div>
         <button onClick={(e) => {
             console.log(config);
             const results: number[] = [];
-            for (let i = 0; i< 10000; i++){
+            for (let i = 0; i < 10000; i++) {
                 results.push(SingleRoll(config));
             }
             setResult(results);
@@ -426,10 +434,10 @@ function App() {
     </div>;
 };
 
-const NumInput = ({v, setV, label}: {v: number, setV: (v: number) => void, label: string}) => {
+const NumInput = ({ v, setV, label }: { v: number, setV: (v: number) => void, label: string }) => {
     const id = useId();
-    return <>
+    return <div className={styles.between}>
         <label htmlFor={id}>{label}</label>
-        <input type="number" min="0" max="50" value={v} onChange={(e) => isNaN(e.target.valueAsNumber) ? setV(0) : setV(e.target.valueAsNumber)}/>
-    </>;
+        <input type="number" min="0" max="50" value={v} onChange={(e) => isNaN(e.target.valueAsNumber) ? setV(0) : setV(e.target.valueAsNumber)} />
+    </div>;
 };

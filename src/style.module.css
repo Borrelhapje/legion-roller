@@ -1,0 +1,9 @@
+.between {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.config {
+    max-width: 20vw;
+}
