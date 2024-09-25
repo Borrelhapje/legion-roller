@@ -68,6 +68,9 @@ const coverFilter: AttackFilter = (r,a ) => {
     }
     const toRoll = a.hits - (r.lowProfile ? 1 : 0);
     const roll = defDice(toRoll, false);
+    if (r.lowProfile) {
+        roll.blocks++;
+    }
     if (c === 1) {
         return {...a, hits: a.hits - roll.blocks};
     }
@@ -308,11 +311,11 @@ interface RollConfig {
     impact: number,
     pierce: number,
 
-    cover: 0 | 1| 2,
+    cover: number,
     lowProfile: boolean,
     shields: number,
     dodges: number,
-    armor: 0| 1|2|3|4|5,
+    armor: number,
     defDice: boolean,
     defSurge: boolean,
     defSurgeTokens: number,
@@ -396,6 +399,17 @@ function App() {
                 </select>
                 <label htmlFor="def-surge">Convert surges</label>
                 <input id="def-surge" type="checkbox" checked={config.defSurge} onChange={(e) => setConfig(prev => {return {...prev, defSurge: e.target.checked}})}/>
+                <NumInput v={config.dodges} setV={(v) => setConfig(prev => {return {...prev, dodges: v}})} label="Dodge tokens"/>
+                <NumInput v={config.shields} setV={(v) => setConfig(prev => {return {...prev, shields: v}})} label="Shield tokens"/>
+                <NumInput v={config.defSurgeTokens} setV={(v) => setConfig(prev => {return {...prev, defSurgeTokens: v}})} label="Surge tokens"/>
+                <NumInput v={config.cover} setV={(v) => setConfig(prev => {return {...prev, cover: v}})} label="Cover X"/>
+                <NumInput v={config.armor} setV={(v) => setConfig(prev => {return {...prev, armor: v}})} label="Armor X"/>
+                <NumInput v={config.dangerSense} setV={(v) => setConfig(prev => {return {...prev, dangerSense: v}})} label="Danger sense X"/>
+                <label htmlFor="low-profile">Low profile</label>
+                <input id="low-profile" type="checkbox" checked={config.lowProfile} onChange={(e) => setConfig(prev => {return {...prev, lowProfile: e.target.checked}})}/>
+                <label htmlFor="impervious">Impervious</label>
+                <input id="impervious" type="checkbox" checked={config.impervious} onChange={(e) => setConfig(prev => {return {...prev, impervious: e.target.checked}})}/>
+
             </div>
         </div>
         <button onClick={(e) => {
