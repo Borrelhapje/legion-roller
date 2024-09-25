@@ -1,4 +1,4 @@
-import { StrictMode, startTransition, useEffect, useMemo, useState } from 'react';
+import { StrictMode, startTransition, useEffect, useId, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
         const div = document.createElement('div');
@@ -116,7 +116,7 @@ const ramFilter: AttackFilter = (r,a) => {
             copy.crits += ramRemaining;
             copy.surges -= ramRemaining;
         } else {
-            copy.crits += ramRemaining;
+            copy.crits += copy.surges;
             ramRemaining -= copy.surges;
             copy.surges = 0;
             if (copy.hits >= ramRemaining) {
@@ -301,7 +301,7 @@ interface RollConfig {
     atkSurge: AtkSurge,
     critical: number,
     atkSurges: number,
-    sharpShooter: 0 | 1 |2,
+    sharpShooter: number,
     blast: boolean,
     highVelocity: boolean,
     ram: number,
@@ -350,12 +350,9 @@ function App() {
     return <div>
         <div className="config">
             <div>
-            <label htmlFor="redAtk">Red</label>
-            <input id="redAtk" type="number" min="0" max="50" value={config.redAtk} onChange={(e) => setConfig(prev => {return {...prev, redAtk: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber}})}/>
-            <label htmlFor="blackAtk">Black</label>
-            <input id="blackAtk" type="number" min="0" max="50" value={config.blackAtk} onChange={(e) => setConfig(prev => {return {...prev, blackAtk: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber}})}/>
-            <label htmlFor="whiteAtk">White</label>
-            <input id="whiteAtk" type="number" min="0" max="50" value={config.whiteAtk} onChange={(e) => setConfig(prev => {return {...prev, whiteAtk: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber}})}/>
+            <NumInput v={config.redAtk} setV={(v) => setConfig(prev => {return {...prev, redAtk: v}})} label="Red"/>
+            <NumInput v={config.blackAtk} setV={(v) => setConfig(prev => {return {...prev, blackAtk: v}})} label="Black"/>
+            <NumInput v={config.whiteAtk} setV={(v) => setConfig(prev => {return {...prev, whiteAtk: v}})} label="White"/>
             </div>
             <div>
                 <label htmlFor="atkSurge">Convert surges to</label>
@@ -364,6 +361,13 @@ function App() {
                     <option value="Hit" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.Hit}})}>Hit</option>
                     <option value="Crit" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.Crit}})}>Crit</option>
                 </select>
+                <NumInput v={config.atkSurges} setV={(v) => setConfig(prev => {return {...prev, atkSurges: v}})} label="Surge tokens"/>
+                <NumInput v={config.critical} setV={(v) => setConfig(prev => {return {...prev, critical: v}})} label="Critical X"/>
+                <NumInput v={config.pierce} setV={(v) => setConfig(prev => {return {...prev, pierce: v}})} label="Pierce X"/>
+                <NumInput v={config.impact} setV={(v) => setConfig(prev => {return {...prev, impact: v}})} label="Impact X"/>
+                <NumInput v={config.ram} setV={(v) => setConfig(prev => {return {...prev, ram: v}})} label="Ram X"/>
+                <NumInput v={config.sharpShooter} setV={(v) => setConfig(prev => {return {...prev, sharpShooter: v}})} label="Sharpshooter X"/>
+
             </div>
         </div>
         <button onClick={(e) => {
@@ -379,4 +383,10 @@ function App() {
     </div>;
 };
 
-
+const NumInput = ({v, setV, label}: {v: number, setV: (v: number) => void, label: string}) => {
+    const id = useId();
+    return <>
+        <label htmlFor={id}>{label}</label>
+        <input type="number" min="0" max="50" value={v} onChange={(e) => isNaN(e.target.valueAsNumber) ? setV(0) : setV(e.target.valueAsNumber)}/>
+    </>;
+};
