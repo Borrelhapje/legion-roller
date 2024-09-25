@@ -367,7 +367,10 @@ function App() {
                 <NumInput v={config.impact} setV={(v) => setConfig(prev => {return {...prev, impact: v}})} label="Impact X"/>
                 <NumInput v={config.ram} setV={(v) => setConfig(prev => {return {...prev, ram: v}})} label="Ram X"/>
                 <NumInput v={config.sharpShooter} setV={(v) => setConfig(prev => {return {...prev, sharpShooter: v}})} label="Sharpshooter X"/>
-
+                <label htmlFor="blast">Blast</label>
+                <input id="blast" type="checkbox" checked={config.blast} onChange={(e) => setConfig(prev => {return {...prev, blast: e.target.checked}})}/>
+                <label htmlFor="highvelocity">High Velocity</label>
+                <input id="highvelocity" type="checkbox" checked={config.highVelocity} onChange={(e) => setConfig(prev => {return {...prev, highVelocity: e.target.checked}})}/>
             </div>
         </div>
         <button onClick={(e) => {
