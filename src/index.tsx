@@ -354,12 +354,26 @@ function App() {
             <NumInput v={config.blackAtk} setV={(v) => setConfig(prev => {return {...prev, blackAtk: v}})} label="Black"/>
             <NumInput v={config.whiteAtk} setV={(v) => setConfig(prev => {return {...prev, whiteAtk: v}})} label="White"/>
             </div>
-            <div>
+            <div id="attack-advanced">
                 <label htmlFor="atkSurge">Convert surges to</label>
-                <select id="atkSurge">
-                    <option value="None" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.None}})}>None</option>
-                    <option value="Hit" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.Hit}})}>Hit</option>
-                    <option value="Crit" onSelect={(e) => setConfig(prev => {return {...prev, atkSurge: AtkSurge.Crit}})}>Crit</option>
+                <select id="atkSurge" onChange={(e) => setConfig(prev => {
+                    let surge: AtkSurge = AtkSurge.None;
+                    switch (e.target.value){
+                        case "0":
+                            surge = AtkSurge.None;
+                            break;
+                        case "1":
+                            surge = AtkSurge.Hit;
+                            break;
+                        case "2":
+                            surge = AtkSurge.Crit;
+                            break;
+                    }
+                    return {...prev, atkSurge: surge};
+                    })}>
+                    <option value="0">None</option>
+                    <option value="1">Hit</option>
+                    <option value="2">Crit</option>
                 </select>
                 <NumInput v={config.atkSurges} setV={(v) => setConfig(prev => {return {...prev, atkSurges: v}})} label="Surge tokens"/>
                 <NumInput v={config.critical} setV={(v) => setConfig(prev => {return {...prev, critical: v}})} label="Critical X"/>
@@ -372,8 +386,20 @@ function App() {
                 <label htmlFor="highvelocity">High Velocity</label>
                 <input id="highvelocity" type="checkbox" checked={config.highVelocity} onChange={(e) => setConfig(prev => {return {...prev, highVelocity: e.target.checked}})}/>
             </div>
+            <div id="defense">
+                <label htmlFor="defense-type">Defend with</label>
+                <select id="defense-type" onChange={(e) => {
+                    setConfig(prev => {return {...prev, defDice: e.target.value === "1"}});
+                }}>
+                    <option value="0">White</option>
+                    <option value="1">Red</option>
+                </select>
+                <label htmlFor="def-surge">Convert surges</label>
+                <input id="def-surge" type="checkbox" checked={config.defSurge} onChange={(e) => setConfig(prev => {return {...prev, defSurge: e.target.checked}})}/>
+            </div>
         </div>
         <button onClick={(e) => {
+            console.log(config);
             const results: number[] = [];
             for (let i = 0; i< 10000; i++){
                 results.push(SingleRoll(config));
