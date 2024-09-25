@@ -33,6 +33,7 @@ interface RollConfig {
     highVelocity: boolean,
     ram: number,
     impact: number,
+    pierce: number,
 
     cover: 0 | 1| 2,
     lowProfile: boolean,
@@ -40,7 +41,10 @@ interface RollConfig {
     dodges: number,
     armor: 0| 1|2|3|4|5,
     defDice: boolean,
-    defSurge: boolean
+    defSurge: boolean,
+    defSurgeTokens: number,
+    dangerSense: number,
+    impervious: boolean,
 }
 
 const SingleRoll : (r : RollConfig) => number = (r) =>  {
@@ -49,20 +53,29 @@ const SingleRoll : (r : RollConfig) => number = (r) =>  {
     const whiteRoll = E(r.whiteAtk, AtkDice.White);
     //losse dice types zijn belangrijk voor aims, verder niet
 
-    const totalAtkRoll : AtkRoll = {
+    let roll : AtkRoll = {
         crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
         hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
         miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
         surges: redRoll.surges + blackRoll.surges + whiteRoll.surges,
     };
-    const afterCritical = criticalFilter(r, totalAtkRoll);
-    const afterSurgeToken = surgeTokenAtkFilter(r, afterCritical);
-    const afterSurge = surgeConversionAtk(r, afterSurgeToken);
-
-    const rollDefDice = defDice(afterSurge.crits + afterSurge.hits, r.defDice);
-    const afterDefSurge = surgeConversionDef(r, rollDefDice);
-
-    return afterSurge.crits + afterSurge.hits - afterDefSurge.blocks;
+    roll = criticalFilter(r, roll);
+    roll = surgeTokenAtkFilter(r, roll);
+    roll = surgeConversionAtk(r, roll);
+    //dodge+cover step
+    roll = coverFilter(r, roll);
+    roll = shieldFilter(r, roll);
+    roll = dodgeFilter(r, roll);
+    //modify atk dice step
+    roll = ramFilter(r, roll);
+    roll = impactFilter(r, roll);
+    roll = armorFilter(r, roll);
+    //roll def dice step
+    let defRoll = defDice(roll.crits + roll.hits + r.dangerSense + (r.impervious ? r.pierce : 0), r.defDice);
+    defRoll = surgeTokenDef(r, defRoll);
+    defRoll = surgeConversionDef(r, defRoll);
+    defRoll = pierceDef(r, defRoll);
+    return roll.crits + roll.hits - defRoll.blocks;
 };
 
 const coverFilter: AttackFilter = (r,a ) => {
@@ -213,7 +226,9 @@ const surgeConversionAtk: AttackFilter = (r, a) => {
     return copy;
 }
 
-const surgeConversionDef = (r: RollConfig, a: DefRoll) => {
+type DefFilter = (r: RollConfig, a: DefRoll) => DefRoll;
+
+const surgeConversionDef: DefFilter = (r, a) => {
     const copy = {...a};
     if (r.defSurge) {
         copy.blocks += copy.surges;
@@ -221,6 +236,20 @@ const surgeConversionDef = (r: RollConfig, a: DefRoll) => {
     }
     return copy;
 }
+
+const surgeTokenDef: DefFilter = (r,a) => {
+    if (r.defSurgeTokens >= a.surges) {
+        return {...a, blocks: a.blocks + a.surges, surges: 0};
+    }
+    return {...a, blocks: a.blocks + r.defSurgeTokens, surges: a.surges - r.defSurgeTokens};
+};
+
+const pierceDef: DefFilter = (r,a) => {
+    if (a.blocks <= r.pierce) {
+        return {...a, blocks: 0};
+    }
+    return {...a, blocks: a.blocks - r.pierce};
+};
 
 enum AtkDice { Red, Black, White};
 
