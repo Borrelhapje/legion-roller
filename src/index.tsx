@@ -353,7 +353,8 @@ function App() {
     const summarized = useMemo(() => summarize(result), [result]);
     return <div>
         <div className={styles.config}>
-            <div>
+            <div style={{display: "flex", justifyContent: "space-between"
+            }}>
                 <NumInput v={config.redAtk} setV={(v) => setConfig(prev => { return { ...prev, redAtk: v } })} label="Red" />
                 <NumInput v={config.blackAtk} setV={(v) => setConfig(prev => { return { ...prev, blackAtk: v } })} label="Black" />
                 <NumInput v={config.whiteAtk} setV={(v) => setConfig(prev => { return { ...prev, whiteAtk: v } })} label="White" />
