@@ -28,8 +28,17 @@ interface RollConfig {
     atkSurge: AtkSurge,
     critical: number,
     atkSurges: number,
+    sharpShooter: 0 | 1 |2,
+    blast: boolean,
+    highVelocity: boolean,
+    ram: number,
+    impact: number,
 
-
+    cover: 0 | 1| 2,
+    lowProfile: boolean,
+    shields: number,
+    dodges: number,
+    armor: 0| 1|2|3|4|5,
     defDice: boolean,
     defSurge: boolean
 }
@@ -56,11 +65,106 @@ const SingleRoll : (r : RollConfig) => number = (r) =>  {
     return afterSurge.crits + afterSurge.hits - afterDefSurge.blocks;
 };
 
+const coverFilter: AttackFilter = (r,a ) => {
+    //determine the cover
+    if (r.blast) {
+        return a;
+    }
+    const c = r.cover - r.sharpShooter;
+    if (c <= 0) {
+        return a;
+    }
+    if (a.hits === 0) {
+        return a;
+    }
+    const toRoll = (a.hits) - (r.lowProfile ? 1 : 0);
+    const roll = defDice(toRoll, false);
+    if (c === 1) {
+        return {...a, hits: a.hits - roll.blocks};
+    }
+    return {...a, hits: a.hits - roll.blocks - roll.surges};
+};
 
+const shieldFilter: AttackFilter = (r,a) => {
+    const copy = {...a};
+    let remainingShields = r.shields;
+    if (remainingShields >= a.crits) {
+        remainingShields -= copy.crits;
+        copy.crits = 0;
+        if (remainingShields >= copy.hits) {
+            copy.hits = 0;
+        } else {
+            copy.hits -= remainingShields;
+        }
+    } else {
+        copy.crits = 0;
+    }
+    return copy;
+}
+
+const dodgeFilter: AttackFilter = (r,a) => {
+    if (r.highVelocity) {
+        return a;
+    }
+    if (r.dodges >= a.hits) {
+        return {...a, hits: 0};
+    } else {
+        return {...a, hits: a.hits - r.dodges};
+    }
+}
+
+const ramFilter: AttackFilter = (r,a) => {
+    let ramRemaining = r.ram;
+    const copy = {...a};
+    if (copy.miss >= ramRemaining) {
+        copy.crits += ramRemaining;
+        copy.miss -= ramRemaining;
+    } else {
+        copy.crits += copy.miss;
+        ramRemaining -= copy.miss;
+        copy.miss = 0;
+        if (copy.surges >= ramRemaining) {
+            copy.crits += ramRemaining;
+            copy.surges -= ramRemaining;
+        } else {
+            copy.crits += ramRemaining;
+            ramRemaining -= copy.surges;
+            copy.surges = 0;
+            if (copy.hits >= ramRemaining) {
+                copy.crits += ramRemaining;
+                copy.hits -= ramRemaining;
+            } else {
+                copy.crits += copy.hits;
+                copy.hits = 0;
+            }
+        }
+    }
+    return copy;
+}
+
+const impactFilter: AttackFilter = (r,a) => {
+    if (r.armor === 0) {
+        return a;
+    }
+    if (a.hits >= r.impact) {
+        return {...a, crits: a.crits + r.impact, hits: a.hits - r.impact};
+    }
+    return {...a, crits: a.crits + a.hits, hits: 0};
+};
+
+const armorFilter: AttackFilter = (r,a) => {
+    if (r.armor === 0) {
+        return a;
+    }
+    if (a.hits <= r.armor) {
+        return {...a, hits: 0};
+    }
+    return {...a, hits: a.hits - r.armor};
+};
 
 type AttackFilter = (r: RollConfig, a: AtkRoll) => AtkRoll;
 
-const criticalFilter = (r: RollConfig, a: AtkRoll) => {
+const criticalFilter: AttackFilter = (r, a) => {
     if (r.critical === 0 || a.surges === 0) {
         return a;
     }
@@ -75,7 +179,7 @@ const criticalFilter = (r: RollConfig, a: AtkRoll) => {
     return copy;
 }
 
-const surgeTokenAtkFilter = (r: RollConfig, a: AtkRoll) => {
+const surgeTokenAtkFilter: AttackFilter = (r, a) => {
     if (r.atkSurges === 0 || a.surges === 0) {
         return a;
     }
@@ -90,7 +194,7 @@ const surgeTokenAtkFilter = (r: RollConfig, a: AtkRoll) => {
     return copy;
 }
 
-const surgeConversionAtk = (r: RollConfig, a: AtkRoll) => {
+const surgeConversionAtk: AttackFilter = (r, a) => {
     const copy = {...a};
     switch (r.atkSurge) {
         case AtkSurge.None:
