@@ -1,13 +1,13 @@
-import { StrictMode, startTransition, useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import styles from "./style.module.css";
+import { Bar } from 'react-chartjs-2';
+import { BarController, BarElement, CategoryScale, Chart, LinearScale } from 'chart.js';
+Chart.register(LinearScale, CategoryScale, BarController, BarElement);
 
 const div = document.createElement('div');
 document.body.appendChild(div);
 createRoot(div).render(<App />);
-
-
-
 
 interface AtkRoll {
     miss: number,
@@ -411,10 +411,23 @@ const R: (limit: number) => number = (l) => {
     return n;
 };
 
+interface Summary {
+    average: number,
+    spread: number[];
+}
+
 const summarize = (r: number[]) => {
     const total = r.reduce((prev, current) => prev + current, 0);
     const average = total / (Math.max(r.length, 1));
-    return average;
+    const max = Math.max(...r);
+    const spread: number[] = [];
+    for (let i = 0; i <= max; i++) {
+        spread.push(0);
+    }
+    for (const roll of r) {
+        spread[roll]++;
+    }
+    return { average: average, spread: spread };
 };
 
 interface RollConfig {
@@ -485,7 +498,7 @@ function App() {
         setResult(results);
     }, [config]);
     const summarized = useMemo(() => summarize(result), [result]);
-    return <div>
+    return <div style={{display: 'flex', flexDirection: "row"}}>
         <div className={styles.config}>
             <div>This code will simulate 10000 attack rolls with the given dice and modifications to come to a concrete result. The shown result automatically updates when you change the configuration.</div>
             <hr></hr>
@@ -566,11 +579,20 @@ function App() {
             </div>
             <hr></hr>
         </div>
-        <div className="results">
-           The average number of wounds is {summarized}
+        <div className={styles.results}>
+            The average number of wounds on this attack is {summarized.average}.
+            <Bar data={{labels: summarized.spread.map((_, i) => `${i}`),
+                datasets: [{
+                    label: '# of Wounds',
+                    data: summarized.spread.map(i => i / result.length),
+                    borderWidth: 1
+                }]}}
+                options={{scales: {y: {beginAtZero: true}}}} />
         </div>
     </div>;
 };
+
+//add the spread of results
 
 const NumInput = ({ v, setV, label }: { v: number, setV: (v: number) => void, label: string }) => {
     const id = useId();
