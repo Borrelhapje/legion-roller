@@ -29,13 +29,8 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     const blackRoll = E(r.blackAtk, AtkDice.Black);
     const whiteRoll = E(r.whiteAtk, AtkDice.White);
     //losse dice types zijn belangrijk voor aims, verder niet
-
-    let roll: AtkRoll = {
-        crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
-        hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
-        miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
-        surges: redRoll.surges + blackRoll.surges + whiteRoll.surges,
-    };
+    //reroll atk dice step
+    let roll: AtkRoll = applyAims(r, redRoll, blackRoll, whiteRoll);
     roll = criticalFilter(r, roll);
     roll = surgeTokenAtkFilter(r, roll);
     roll = surgeConversionAtk(r, roll);
@@ -50,10 +45,112 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     roll = armorFilter(r, roll);
     //roll def dice step
     let defRoll = defDice(roll.crits + roll.hits + r.dangerSense + (r.impervious ? r.pierce : 0), r.defDice);
+    //reroll def dice step
+    //apply danger sense
+    //modify def dice step
     defRoll = surgeTokenDef(r, defRoll);
     defRoll = surgeConversionDef(r, defRoll);
     defRoll = pierceDef(r, defRoll);
     return roll.crits + roll.hits - defRoll.blocks;
+};
+
+const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, whiteRoll: AtkRoll) => {
+    if (roll.aims <= 0) {
+        return {
+            crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
+            hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
+            miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
+            surges: redRoll.surges + blackRoll.surges + whiteRoll.surges,
+        };
+    }
+    const rerollMax = 2 + roll.precise;
+    //reroll logic
+    //at that point, select up to rerollMax blank dice, starting with red, then black, then white
+    //reroll these and come to a new roll
+    //repeat until aims run out or no dice are black
+
+    //determine number of surges left, to see if we should reroll them
+    let surgeConversionLeft = roll.atkSurge !== AtkSurge.None ? Number.MAX_SAFE_INTEGER : roll.critical + roll.atkSurges;
+    let aims = roll.aims;
+    //if no surge conversion applies at all, always reroll them
+    //if surge conversion applies always, never reroll them
+    //if surge conversion has a limit, reroll red first, then black, then white since better dice are more likely to become a hit
+    while (aims > 0) {
+        // at all times limit number of dice to reroll to rerollMax
+        // potentialSurgesToReroll is a counter to determine how many surges we may want to reroll
+        let potentialSurgesToReroll = Math.max(0, redRoll.surges + blackRoll.surges + whiteRoll.surges - surgeConversionLeft);
+        let currentDiceRerolled = 0;
+        let redMiss;
+        let redSurge;
+        let blackMiss;
+        let blackSurge;
+        let whiteMiss;
+        let whiteSurge;
+
+        //we reroll red misses, and if we want to reroll surges, also reroll at most that many red surges
+        redMiss = Math.min(redRoll.miss, rerollMax - currentDiceRerolled);
+        currentDiceRerolled += redMiss;
+        if (potentialSurgesToReroll > 0) {
+            redSurge = Math.min(Math.min(redRoll.surges, potentialSurgesToReroll), rerollMax - currentDiceRerolled);
+            potentialSurgesToReroll -= redSurge;
+        } else {
+            redSurge = 0;
+        }
+        currentDiceRerolled += redSurge;
+        
+        //black
+        blackMiss = Math.min(blackRoll.miss, rerollMax - currentDiceRerolled);
+        currentDiceRerolled += blackMiss;
+        if (potentialSurgesToReroll > 0) {
+            blackSurge = Math.min(Math.min(blackRoll.surges, potentialSurgesToReroll), rerollMax - currentDiceRerolled);
+            potentialSurgesToReroll -= blackSurge;
+        } else {
+            blackSurge = 0;
+        }
+        currentDiceRerolled += blackSurge;
+
+        //white
+        whiteMiss = Math.min(whiteRoll.miss, rerollMax - currentDiceRerolled);
+        currentDiceRerolled += whiteMiss;
+        if (potentialSurgesToReroll > 0) {
+            whiteSurge = Math.min(Math.min(whiteRoll.surges, potentialSurgesToReroll), rerollMax - currentDiceRerolled);
+            potentialSurgesToReroll -= whiteSurge;
+        } else {
+            whiteSurge = 0;
+        }
+        currentDiceRerolled += whiteSurge;
+
+        //now we do the actual reroll
+        redRoll.miss -= redMiss;
+        redRoll.surges -= redSurge;
+        blackRoll.miss -= blackMiss;
+        blackRoll.surges -= blackSurge;
+        whiteRoll.miss -= whiteMiss;
+        whiteRoll.surges -= whiteSurge;
+        const newRedRoll = E(redMiss + redSurge, AtkDice.Red);
+        redRoll.crits += newRedRoll.crits;
+        redRoll.hits += newRedRoll.hits;
+        redRoll.miss += newRedRoll.miss;
+        redRoll.surges += newRedRoll.surges;
+        const newBlackRoll = E(blackMiss + blackSurge, AtkDice.Black);
+        blackRoll.crits += newBlackRoll.crits;
+        blackRoll.hits += newBlackRoll.hits;
+        blackRoll.miss += newBlackRoll.miss;
+        blackRoll.surges += newBlackRoll.surges;
+        const newWhiteRoll = E(whiteMiss + whiteSurge, AtkDice.White);
+        whiteRoll.crits += newWhiteRoll.crits;
+        whiteRoll.hits += newWhiteRoll.hits;
+        whiteRoll.miss += newWhiteRoll.miss;
+        whiteRoll.surges += newWhiteRoll.surges;
+        aims--;
+    }
+    //extra option: consider armor
+    return {
+        crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
+        hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
+        miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
+        surges: redRoll.surges + blackRoll.surges + whiteRoll.surges,
+    };
 };
 
 const coverFilter: AttackFilter = (r, a) => {
@@ -313,6 +410,8 @@ interface RollConfig {
     atkSurge: AtkSurge,
     critical: number,
     atkSurges: number,
+    aims: number,
+    precise: number,
     sharpShooter: number,
     blast: boolean,
     highVelocity: boolean,
@@ -336,10 +435,13 @@ interface RollConfig {
 function App() {
     const [config, setConfig] = useState<RollConfig>({
         armor: 0,
+        aims: 0,
+        precise: 0,
         atkSurge: AtkSurge.None,
         atkSurges: 0,
         blackAtk: 0,
         blast: false,
+        backup: false,
         cover: 0,
         critical: 0,
         dangerSense: 0,
@@ -391,6 +493,8 @@ function App() {
                         <option value="2">Crit</option>
                     </select>
                 </div>
+                <NumInput v={config.aims} setV={(v) => setConfig(prev => { return { ...prev, aims: v } })} label="Aim tokens" />
+                <NumInput v={config.precise} setV={(v) => setConfig(prev => { return { ...prev, precise: v } })} label="Precise X" />
                 <NumInput v={config.atkSurges} setV={(v) => setConfig(prev => { return { ...prev, atkSurges: v } })} label="Surge tokens" />
                 <NumInput v={config.critical} setV={(v) => setConfig(prev => { return { ...prev, critical: v } })} label="Critical X" />
                 <NumInput v={config.pierce} setV={(v) => setConfig(prev => { return { ...prev, pierce: v } })} label="Pierce X" />
