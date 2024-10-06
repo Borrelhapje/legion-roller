@@ -46,7 +46,7 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     //roll def dice step
     let defRoll = defDice(roll.crits + roll.hits + r.dangerSense + (r.impervious ? r.pierce : 0), r.defDice);
     //reroll def dice step
-    //apply danger sense
+    defRoll = uncannyLuckDef(r, defRoll);
     //modify def dice step
     defRoll = surgeTokenDef(r, defRoll);
     defRoll = surgeConversionDef(r, defRoll);
@@ -70,7 +70,7 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
     //repeat until aims run out or no dice are black
 
     //determine number of surges left, to see if we should reroll them
-    let surgeConversionLeft = roll.atkSurge !== AtkSurge.None ? Number.MAX_SAFE_INTEGER : roll.critical + roll.atkSurges;
+    const surgeConversionLeft = roll.atkSurge !== AtkSurge.None ? 10000 : roll.critical + roll.atkSurges;
     let aims = roll.aims;
     //if no surge conversion applies at all, always reroll them
     //if surge conversion applies always, never reroll them
@@ -97,7 +97,7 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
             redSurge = 0;
         }
         currentDiceRerolled += redSurge;
-        
+
         //black
         blackMiss = Math.min(blackRoll.miss, rerollMax - currentDiceRerolled);
         currentDiceRerolled += blackMiss;
@@ -306,12 +306,26 @@ const surgeConversionAtk: AttackFilter = (r, a) => {
 
 type DefFilter = (r: RollConfig, a: DefRoll) => DefRoll;
 
-const backupDef: AttackFilter = (r,a) => {
+const backupDef: AttackFilter = (r, a) => {
     if (!r.backup) {
         return a;
     }
-    return {...a, hits: Math.max(0, a.hits - 2)};
+    return { ...a, hits: Math.max(0, a.hits - 2) };
 };
+
+const uncannyLuckDef: DefFilter = (r, a) => {
+    const maxReroll = r.uncannyLuck;
+    const surgeConversionLeft = r.defSurge ? 10000 : r.defSurgeTokens;
+    const missReroll = Math.min(a.miss, maxReroll);
+    const surgeReroll = Math.min(Math.max(0, a.surges - surgeConversionLeft), maxReroll - missReroll);
+    a.miss -= missReroll;
+    a.surges -= surgeReroll;
+    const reroll = defDice(missReroll + surgeReroll, r.defDice);
+    a.blocks += reroll.blocks;
+    a.miss += reroll.miss;
+    a.surges += reroll.surges;
+    return a;
+}
 
 const surgeConversionDef: DefFilter = (r, a) => {
     const copy = { ...a };
@@ -428,6 +442,7 @@ interface RollConfig {
     defSurge: boolean,
     defSurgeTokens: number,
     dangerSense: number,
+    uncannyLuck: number,
     impervious: boolean,
     backup: boolean,
 }
@@ -458,13 +473,15 @@ function App() {
         redAtk: 3,
         sharpShooter: 0,
         shields: 0,
-        whiteAtk: 0
+        whiteAtk: 0,
+        uncannyLuck: 0,
     });
     const [result, setResult] = useState<number[]>([]);
     const summarized = useMemo(() => summarize(result), [result]);
     return <div>
         <div className={styles.config}>
-            <div style={{display: "flex", justifyContent: "space-between"
+            <div style={{
+                display: "flex", justifyContent: "space-between"
             }}>
                 <NumInput v={config.redAtk} setV={(v) => setConfig(prev => { return { ...prev, redAtk: v } })} label="Red" />
                 <NumInput v={config.blackAtk} setV={(v) => setConfig(prev => { return { ...prev, blackAtk: v } })} label="Black" />
@@ -528,6 +545,7 @@ function App() {
                 <NumInput v={config.cover} setV={(v) => setConfig(prev => { return { ...prev, cover: v } })} label="Cover X" />
                 <NumInput v={config.armor} setV={(v) => setConfig(prev => { return { ...prev, armor: v } })} label="Armor X" />
                 <NumInput v={config.dangerSense} setV={(v) => setConfig(prev => { return { ...prev, dangerSense: v } })} label="Danger sense X" />
+                <NumInput v={config.uncannyLuck} setV={(v) => setConfig(prev => { return { ...prev, uncannyLuck: v } })} label="Uncanny luck X" />
                 <label htmlFor="low-profile">Low profile</label>
                 <input id="low-profile" type="checkbox" checked={config.lowProfile} onChange={(e) => setConfig(prev => { return { ...prev, lowProfile: e.target.checked } })} />
                 <label htmlFor="impervious">Impervious</label>
