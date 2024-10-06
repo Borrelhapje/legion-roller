@@ -46,6 +46,7 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     //modify atk dice step
     roll = ramFilter(r, roll);
     roll = impactFilter(r, roll);
+    roll = backupDef(r, roll);
     roll = armorFilter(r, roll);
     //roll def dice step
     let defRoll = defDice(roll.crits + roll.hits + r.dangerSense + (r.impervious ? r.pierce : 0), r.defDice);
@@ -208,6 +209,13 @@ const surgeConversionAtk: AttackFilter = (r, a) => {
 
 type DefFilter = (r: RollConfig, a: DefRoll) => DefRoll;
 
+const backupDef: AttackFilter = (r,a) => {
+    if (!r.backup) {
+        return a;
+    }
+    return {...a, hits: Math.max(0, a.hits - 2)};
+};
+
 const surgeConversionDef: DefFilter = (r, a) => {
     const copy = { ...a };
     if (r.defSurge) {
@@ -322,6 +330,7 @@ interface RollConfig {
     defSurgeTokens: number,
     dangerSense: number,
     impervious: boolean,
+    backup: boolean,
 }
 
 function App() {
