@@ -477,9 +477,18 @@ function App() {
         uncannyLuck: 0,
     });
     const [result, setResult] = useState<number[]>([]);
+    useEffect(() => {
+        const results: number[] = [];
+        for (let i = 0; i < 10000; i++) {
+            results.push(SingleRoll(config));
+        }
+        setResult(results);
+    }, [config]);
     const summarized = useMemo(() => summarize(result), [result]);
     return <div>
         <div className={styles.config}>
+            <div>This code will simulate 10000 attack rolls with the given dice and modifications to come to a concrete result. The shown result automatically updates when you change the configuration.</div>
+            <hr></hr>
             <div style={{
                 display: "flex", justifyContent: "space-between"
             }}>
@@ -488,6 +497,7 @@ function App() {
                 <NumInput v={config.whiteAtk} setV={(v) => setConfig(prev => { return { ...prev, whiteAtk: v } })} label="White" />
             </div>
             <div id="attack-advanced" style={{ display: "flex", flexDirection: "column", maxWidth: "20vw" }}>
+                <h2>Attack modifications</h2>
                 <div className={styles.between}>
                     <label htmlFor="atkSurge">Convert surges to</label>
                     <select id="atkSurge" onChange={(e) => setConfig(prev => {
@@ -527,6 +537,7 @@ function App() {
                 </div></div>
             <hr></hr>
             <div id="defense">
+                <h2>Defense modifications</h2>
                 <div className={styles.between}>
                     <label htmlFor="defense-type">Defend with</label>
                     <select id="defense-type" onChange={(e) => {
@@ -553,17 +564,10 @@ function App() {
                 <label htmlFor="backup">Backup</label>
                 <input id="backup" type="checkbox" checked={config.backup} onChange={(e) => setConfig(prev => { return { ...prev, backup: e.target.checked } })} />
             </div>
+            <hr></hr>
         </div>
-        <button onClick={(e) => {
-            console.log(config);
-            const results: number[] = [];
-            for (let i = 0; i < 10000; i++) {
-                results.push(SingleRoll(config));
-            }
-            setResult(results);
-        }}>Roll</button>
         <div className="results">
-            {summarized}
+           The average number of wounds is {summarized}
         </div>
     </div>;
 };
