@@ -428,6 +428,8 @@ function App() {
                 <input id="low-profile" type="checkbox" checked={config.lowProfile} onChange={(e) => setConfig(prev => { return { ...prev, lowProfile: e.target.checked } })} />
                 <label htmlFor="impervious">Impervious</label>
                 <input id="impervious" type="checkbox" checked={config.impervious} onChange={(e) => setConfig(prev => { return { ...prev, impervious: e.target.checked } })} />
+                <label htmlFor="backup">Backup</label>
+                <input id="backup" type="checkbox" checked={config.backup} onChange={(e) => setConfig(prev => { return { ...prev, backup: e.target.checked } })} />
             </div>
         </div>
         <button onClick={(e) => {
