@@ -489,18 +489,23 @@ function App() {
         whiteAtk: 0,
         uncannyLuck: 0,
     });
+    const [rollCount, setRollCount] = useState<number>(10000);
     const [result, setResult] = useState<number[]>([]);
     useEffect(() => {
         const results: number[] = [];
-        for (let i = 0; i < 10000; i++) {
+        for (let i = 0; i < rollCount; i++) {
             results.push(SingleRoll(config));
         }
         setResult(results);
-    }, [config]);
-    const summarized = useMemo(() => summarize(result), [result]);
-    return <div style={{display: 'flex', flexDirection: "row"}}>
+    }, [config, rollCount]);
+    const summarized = useMemo(() => {
+        const summary = summarize(result);
+        console.log(config, summary.average, summary.spread.map(i => i / result.length * 100));
+        return summary;
+    }, [result]);
+    return <div style={{ display: 'flex', flexDirection: "row" }}>
         <div className={styles.config}>
-            <div>This code will simulate 10000 attack rolls with the given dice and modifications to come to a concrete result. The shown result automatically updates when you change the configuration.</div>
+            <div>This code will simulate {rollCount} attack rolls with the given dice and modifications to come to a concrete result. The shown result automatically updates when you change the configuration.</div>
             <hr></hr>
             <div style={{
                 display: "flex", justifyContent: "space-between"
@@ -508,6 +513,8 @@ function App() {
                 <NumInput v={config.redAtk} setV={(v) => setConfig(prev => { return { ...prev, redAtk: v } })} label="Red" />
                 <NumInput v={config.blackAtk} setV={(v) => setConfig(prev => { return { ...prev, blackAtk: v } })} label="Black" />
                 <NumInput v={config.whiteAtk} setV={(v) => setConfig(prev => { return { ...prev, whiteAtk: v } })} label="White" />
+                <label htmlFor="100k">Use 100k rolls</label>
+                <input type="checkbox" title="Use 100 000 rolls for extra accuracy (may use more battery power)" id="100k" onChange={(e) => setRollCount(e.target.checked ? 100_000 : 10_000)} />
             </div>
             <div id="attack-advanced" style={{ display: "flex", flexDirection: "column", maxWidth: "20vw" }}>
                 <h2>Attack modifications</h2>
@@ -581,13 +588,15 @@ function App() {
         </div>
         <div className={styles.results}>
             The average number of wounds on this attack is {summarized.average}.
-            <Bar data={{labels: summarized.spread.map((_, i) => `${i}`),
+            <Bar data={{
+                labels: summarized.spread.map((_, i) => `${i}`),
                 datasets: [{
                     label: '# of Wounds',
                     data: summarized.spread.map(i => i / result.length),
                     borderWidth: 1
-                }]}}
-                options={{scales: {y: {beginAtZero: true}}}} />
+                }]
+            }}
+                options={{ scales: { y: { beginAtZero: true } } }} />
         </div>
     </div>;
 };
@@ -596,8 +605,16 @@ function App() {
 
 const NumInput = ({ v, setV, label }: { v: number, setV: (v: number) => void, label: string }) => {
     const id = useId();
+    const [tempStorage, setTempStorage] = useState<string>(`${v}`);
+    useEffect(() => {
+        const newV = parseInt(tempStorage, 10);
+        if (isNaN(newV)) {
+            return;
+        }
+        setV(newV);
+    }, [tempStorage]);
     return <div className={styles.between}>
         <label htmlFor={id}>{label}</label>
-        <input type="number" min="0" max="50" value={v} onChange={(e) => isNaN(e.target.valueAsNumber) ? setV(0) : setV(e.target.valueAsNumber)} />
+        <input type="number" min="0" max="50" value={tempStorage} onChange={(e) => setTempStorage(e.target.value)} />
     </div>;
 };
