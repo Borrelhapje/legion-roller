@@ -11,5 +11,5 @@
         "matchManagers": ["github-actions"],
     "automerge": true,
     "matchUpdateTypes": ["minor", "patch"]
-  }]]
+  }]
 }
