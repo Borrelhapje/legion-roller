@@ -30,7 +30,7 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     const whiteRoll = E(r.whiteAtk, AtkDice.White);
     //losse dice types zijn belangrijk voor aims, verder niet
     //reroll atk dice step
-    let roll: AtkRoll = applyAims(r, redRoll, blackRoll, whiteRoll);
+    let roll: AtkRoll = aimFilter(r, redRoll, blackRoll, whiteRoll);
     roll = criticalFilter(r, roll);
     roll = surgeTokenAtkFilter(r, roll);
     roll = surgeConversionAtk(r, roll);
@@ -54,16 +54,24 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     return roll.crits + roll.hits - defRoll.blocks;
 };
 
-const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, whiteRoll: AtkRoll) => {
-    if (roll.aims <= 0) {
+const aimFilter = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, whiteRoll: AtkRoll) => {
+    const {rRoll, bRoll, wRoll} =  applyAims(roll, redRoll, blackRoll, whiteRoll, roll.aims, 2 + roll.precise);
+    const result = applyAims(roll, rRoll, bRoll, wRoll, roll.observationTokens, 1);
+    const rRoll2 = result.rRoll, bRoll2 = result.bRoll, wRoll2 = result.wRoll;
+    return {
+        crits: rRoll2.crits + bRoll2.crits + wRoll2.crits,
+        hits: rRoll2.hits + bRoll2.hits + wRoll2.hits,
+        miss: rRoll2.miss + bRoll2.miss + wRoll2.miss,
+        surges: rRoll2.surges + bRoll2.surges + wRoll2.surges,
+    }
+}
+
+const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, whiteRoll: AtkRoll, rerolls: number, dicePerReroll: number) => {
+    if (rerolls <= 0) {
         return {
-            crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
-            hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
-            miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
-            surges: redRoll.surges + blackRoll.surges + whiteRoll.surges,
+            rRoll: redRoll, bRoll: blackRoll, wRoll: whiteRoll
         };
     }
-    const rerollMax = 2 + roll.precise;
     //reroll logic
     //at that point, select up to rerollMax blank dice, starting with red, then black, then white
     //reroll these and come to a new roll
@@ -71,7 +79,7 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
 
     //determine number of surges left, to see if we should reroll them
     const surgeConversionLeft = roll.atkSurge !== AtkSurge.None ? 10000 : roll.critical + roll.atkSurges;
-    let aims = roll.aims;
+    let aims = rerolls;
     //if no surge conversion applies at all, always reroll them
     //if surge conversion applies always, never reroll them
     //if surge conversion has a limit, reroll red first, then black, then white since better dice are more likely to become a hit
@@ -88,10 +96,10 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
         let whiteSurge;
 
         //we reroll red misses, and if we want to reroll surges, also reroll at most that many red surges
-        redMiss = Math.min(redRoll.miss, rerollMax - currentDiceRerolled);
+        redMiss = Math.min(redRoll.miss, dicePerReroll - currentDiceRerolled);
         currentDiceRerolled += redMiss;
         if (potentialSurgesToReroll > 0) {
-            redSurge = Math.min(Math.min(redRoll.surges, potentialSurgesToReroll), rerollMax - currentDiceRerolled);
+            redSurge = Math.min(Math.min(redRoll.surges, potentialSurgesToReroll), dicePerReroll - currentDiceRerolled);
             potentialSurgesToReroll -= redSurge;
         } else {
             redSurge = 0;
@@ -99,10 +107,10 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
         currentDiceRerolled += redSurge;
 
         //black
-        blackMiss = Math.min(blackRoll.miss, rerollMax - currentDiceRerolled);
+        blackMiss = Math.min(blackRoll.miss, dicePerReroll - currentDiceRerolled);
         currentDiceRerolled += blackMiss;
         if (potentialSurgesToReroll > 0) {
-            blackSurge = Math.min(Math.min(blackRoll.surges, potentialSurgesToReroll), rerollMax - currentDiceRerolled);
+            blackSurge = Math.min(Math.min(blackRoll.surges, potentialSurgesToReroll), dicePerReroll - currentDiceRerolled);
             potentialSurgesToReroll -= blackSurge;
         } else {
             blackSurge = 0;
@@ -110,10 +118,10 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
         currentDiceRerolled += blackSurge;
 
         //white
-        whiteMiss = Math.min(whiteRoll.miss, rerollMax - currentDiceRerolled);
+        whiteMiss = Math.min(whiteRoll.miss, dicePerReroll - currentDiceRerolled);
         currentDiceRerolled += whiteMiss;
         if (potentialSurgesToReroll > 0) {
-            whiteSurge = Math.min(Math.min(whiteRoll.surges, potentialSurgesToReroll), rerollMax - currentDiceRerolled);
+            whiteSurge = Math.min(Math.min(whiteRoll.surges, potentialSurgesToReroll), dicePerReroll - currentDiceRerolled);
             potentialSurgesToReroll -= whiteSurge;
         } else {
             whiteSurge = 0;
@@ -146,10 +154,7 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
     }
     //extra option: consider armor
     return {
-        crits: redRoll.crits + blackRoll.crits + whiteRoll.crits,
-        hits: redRoll.hits + blackRoll.hits + whiteRoll.hits,
-        miss: redRoll.miss + blackRoll.miss + whiteRoll.miss,
-        surges: redRoll.surges + blackRoll.surges + whiteRoll.surges,
+        rRoll: redRoll, bRoll: blackRoll, wRoll: whiteRoll
     };
 };
 
@@ -166,7 +171,7 @@ const coverFilter: AttackFilter = (r, a) => {
         return a;
     }
     const toRoll = a.hits - (r.lowProfile ? 1 : 0);
-    const roll = defDice(toRoll, false);
+    const roll = defDice(toRoll, r.dugIn);
     if (r.lowProfile) {
         roll.blocks++;
     }
@@ -438,6 +443,7 @@ interface RollConfig {
     critical: number,
     atkSurges: number,
     aims: number,
+    observationTokens: number,
     precise: number,
     sharpShooter: number,
     blast: boolean,
@@ -447,6 +453,7 @@ interface RollConfig {
     pierce: number,
 
     cover: number,
+    dugIn: boolean,
     lowProfile: boolean,
     shields: number,
     dodges: number,
@@ -477,10 +484,12 @@ function App() {
         defSurge: false,
         defSurgeTokens: 0,
         dodges: 0,
+        dugIn: false,
         highVelocity: false,
         impact: 0,
         impervious: false,
         lowProfile: false,
+        observationTokens: 0,
         pierce: 0,
         ram: 0,
         redAtk: 3,
@@ -541,6 +550,7 @@ function App() {
                     </select>
                 </div>
                 <NumInput v={config.aims} setV={(v) => setConfig(prev => { return { ...prev, aims: v } })} label="Aim tokens" />
+                <NumInput v={config.observationTokens} setV={(v) => setConfig(prev => { return { ...prev, observationTokens: v } })} label="Observation tokens" />
                 <NumInput v={config.precise} setV={(v) => setConfig(prev => { return { ...prev, precise: v } })} label="Precise X" />
                 <NumInput v={config.atkSurges} setV={(v) => setConfig(prev => { return { ...prev, atkSurges: v } })} label="Surge tokens" />
                 <NumInput v={config.critical} setV={(v) => setConfig(prev => { return { ...prev, critical: v } })} label="Critical X" />
@@ -583,6 +593,8 @@ function App() {
                 <input id="impervious" type="checkbox" checked={config.impervious} onChange={(e) => setConfig(prev => { return { ...prev, impervious: e.target.checked } })} />
                 <label htmlFor="backup">Backup</label>
                 <input id="backup" type="checkbox" checked={config.backup} onChange={(e) => setConfig(prev => { return { ...prev, backup: e.target.checked } })} />
+                <label htmlFor="dugin">Dug in</label>
+                <input id="dugin" type="checkbox" checked={config.dugIn} onChange={(e) => setConfig(prev => { return { ...prev, dugIn: e.target.checked } })} />
             </div>
             <hr></hr>
         </div>
