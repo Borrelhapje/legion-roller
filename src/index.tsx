@@ -90,10 +90,13 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
         let currentDiceRerolled = 0;
         let redMiss;
         let redSurge;
+        let redHits;
         let blackMiss;
         let blackSurge;
+        let blackHits;
         let whiteMiss;
         let whiteSurge;
+        let whiteHits;
 
         //we reroll red misses, and if we want to reroll surges, also reroll at most that many red surges
         redMiss = Math.min(redRoll.miss, dicePerReroll - currentDiceRerolled);
@@ -127,32 +130,71 @@ const applyAims = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, white
             whiteSurge = 0;
         }
         currentDiceRerolled += whiteSurge;
-
-        //now we do the actual reroll
+        //reroll hits if current hit count - impact is lower than the armor value, and no blanks/surges are being rerolled with this aim token
+        if (currentDiceRerolled === 0) {
+            //calculate number of hits this will do
+            const surges = redRoll.surges + blackRoll.surges + whiteRoll.surges;
+            //if surge to crit, surges are irrelevant
+            let surgesToAdd;
+            if (roll.atkSurge === AtkSurge.Crit) {
+                surgesToAdd = 0;
+            } else if (roll.atkSurge === AtkSurge.Hit) {
+                surgesToAdd = Math.max(0,surges - roll.critical);
+            } else {
+                surgesToAdd = Math.max(0, Math.min(Math.max(0, surges - roll.critical), roll.atkSurges));
+            }
+            const totalHits = redRoll.hits +blackRoll.hits + whiteRoll.hits + surgesToAdd;
+            //if hits - impact <= armor
+            //if hits === 1, when low profile+cover is active
+            //if hits <= 2, when backup is active
+            //or a combination of above
+            let hitsToReroll = 0;
+            let canceledHits = (roll.backup ? 2: 0) + ((!roll.blast && roll.lowProfile && (roll.cover - roll.sharpShooter > 0)) ? 1 : 0);
+            if (totalHits <= canceledHits) {
+               hitsToReroll += totalHits;
+            }
+            if (totalHits - roll.impact - hitsToReroll <= roll.armor) {
+                hitsToReroll += Math.max(0, totalHits - roll.impact - hitsToReroll);
+            }
+            //it does not really matter which dice we reroll at this point, since it is critfishing, but lets start with red anyway
+            redHits = Math.min(redRoll.hits, Math.min(dicePerReroll, hitsToReroll - currentDiceRerolled));
+            currentDiceRerolled += redHits;
+            blackHits = Math.min(blackRoll.hits, Math.min(dicePerReroll, hitsToReroll - currentDiceRerolled));
+            currentDiceRerolled += blackHits;
+            whiteHits = Math.min(whiteRoll.hits, Math.min(dicePerReroll, hitsToReroll - currentDiceRerolled));
+            currentDiceRerolled += whiteHits;
+        } else {
+            redHits = 0;
+            blackHits = 0;
+            whiteHits = 0;
+        }
+        //now we do the actual reroll, remove the rerolls from the totals, roll, and then add new values
         redRoll.miss -= redMiss;
         redRoll.surges -= redSurge;
+        redRoll.hits -= redHits;
         blackRoll.miss -= blackMiss;
         blackRoll.surges -= blackSurge;
+        blackRoll.hits -= blackHits;
         whiteRoll.miss -= whiteMiss;
         whiteRoll.surges -= whiteSurge;
-        const newRedRoll = E(redMiss + redSurge, AtkDice.Red);
+        whiteRoll.hits -= whiteHits;
+        const newRedRoll = E(redMiss + redSurge + redHits, AtkDice.Red);
         redRoll.crits += newRedRoll.crits;
         redRoll.hits += newRedRoll.hits;
         redRoll.miss += newRedRoll.miss;
         redRoll.surges += newRedRoll.surges;
-        const newBlackRoll = E(blackMiss + blackSurge, AtkDice.Black);
+        const newBlackRoll = E(blackMiss + blackSurge + blackHits, AtkDice.Black);
         blackRoll.crits += newBlackRoll.crits;
         blackRoll.hits += newBlackRoll.hits;
         blackRoll.miss += newBlackRoll.miss;
         blackRoll.surges += newBlackRoll.surges;
-        const newWhiteRoll = E(whiteMiss + whiteSurge, AtkDice.White);
+        const newWhiteRoll = E(whiteMiss + whiteSurge + whiteHits, AtkDice.White);
         whiteRoll.crits += newWhiteRoll.crits;
         whiteRoll.hits += newWhiteRoll.hits;
         whiteRoll.miss += newWhiteRoll.miss;
         whiteRoll.surges += newWhiteRoll.surges;
         aims--;
     }
-    //extra option: consider armor
     return {
         rRoll: redRoll, bRoll: blackRoll, wRoll: whiteRoll
     };
