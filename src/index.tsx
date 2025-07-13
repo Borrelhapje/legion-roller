@@ -318,7 +318,7 @@ const criticalFilter: AttackFilter = (r, a) => {
 }
 
 const surgeTokenAtkFilter: AttackFilter = (r, a) => {
-    if (r.atkSurges === 0 || a.surges === 0) {
+    if (r.atkSurges === 0 || a.surges === 0 || r.atkSurge != AtkSurge.None) {
         return a;
     }
     const copy = { ...a };
