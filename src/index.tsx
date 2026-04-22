@@ -34,6 +34,13 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     roll = criticalFilter(r, roll);
     roll = surgeTokenAtkFilter(r, roll);
     roll = surgeConversionAtk(r, roll);
+    //sniper team step skips all other steps and directly wounds if at least 1 crit was rolled
+    //sniper team activates after 'convert attack surges' step
+    //since next steps may modify crit count we check here if we need to minimize to 1 wound
+    const minimumOneDmg = (r.sniperTeam || r.sniperTeamAlwaysChooseCrit) && roll.crits > 0;
+    if (r.sniperTeamAlwaysChooseCrit && minimumOneDmg) {
+        return 1;
+    }
     //dodge+cover step
     roll = coverFilter(r, roll);
     roll = shieldFilter(r, roll);
@@ -51,7 +58,11 @@ const SingleRoll: (r: RollConfig) => number = (r) => {
     defRoll = surgeTokenDef(r, defRoll);
     defRoll = surgeConversionDef(r, defRoll);
     defRoll = pierceDef(r, defRoll);
-    return roll.crits + roll.hits - defRoll.blocks;
+    const wounds = roll.crits + roll.hits - defRoll.blocks;
+    if (minimumOneDmg && wounds < 1) {
+        return 1;
+    }
+    return wounds;
 };
 
 const aimFilter = (roll: RollConfig, redRoll: AtkRoll, blackRoll: AtkRoll, whiteRoll: AtkRoll) => {
@@ -493,6 +504,8 @@ interface RollConfig {
     ram: number,
     impact: number,
     pierce: number,
+    sniperTeam: boolean,
+    sniperTeamAlwaysChooseCrit: boolean,
 
     cover: number,
     dugIn: boolean,
@@ -537,6 +550,8 @@ function App() {
         redAtk: 3,
         sharpShooter: 0,
         shields: 0,
+        sniperTeam: false,
+        sniperTeamAlwaysChooseCrit: false,
         whiteAtk: 0,
         uncannyLuck: 0,
     });
@@ -603,10 +618,20 @@ function App() {
                 <div className={styles.between}>
                     <label htmlFor="blast">Blast</label>
                     <input id="blast" type="checkbox" checked={config.blast} onChange={(e) => setConfig(prev => { return { ...prev, blast: e.target.checked } })} />
-                </div>                    <div className={styles.between}>
+                </div>
+                <div className={styles.between}>
                     <label htmlFor="highvelocity">High Velocity</label>
                     <input id="highvelocity" type="checkbox" checked={config.highVelocity} onChange={(e) => setConfig(prev => { return { ...prev, highVelocity: e.target.checked } })} />
-                </div></div>
+                </div>
+                <div className={styles.between} title="Note that the implementation of this feature cheats a little: it determines if any crits have been rolled (so the minimum 1 wound is possible), then runs through the normal steps and then picks the higher wound count. If you will always choose the automatic wound, use the next checkbox.">
+                    <label htmlFor="sniperteam">Sniper Team</label>
+                    <input id="sniperteam" type="checkbox" checked={config.sniperTeam} onChange={(e) => setConfig(prev => { return { ...prev, sniperTeam: e.target.checked, sniperTeamAlwaysChooseCrit: e.target.checked ? false: prev.sniperTeamAlwaysChooseCrit } })} />
+                </div>
+                <div className={styles.between} title="This implementation always chooses the guaranteed wound if a crit has been rolled, even if higher damage may be possible through bad defense rolls etc.">
+                    <label htmlFor="sniperteamalways">Sniper Team (always choose guaranteed wound) </label>
+                    <input id="sniperteamalways" type="checkbox" checked={config.sniperTeamAlwaysChooseCrit} onChange={(e) => setConfig(prev => { return { ...prev, sniperTeamAlwaysChooseCrit: e.target.checked, sniperTeam: e.target.checked ? false : prev.sniperTeam } })} />
+                </div>
+                </div>
             <hr></hr>
             <div id="defense">
                 <h2>Defense modifications</h2>
