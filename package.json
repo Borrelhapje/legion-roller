@@ -16,7 +16,7 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^6.0.0",
+    "typescript": "^7.0.0",
     "typescript-plugin-css-modules": "^5.0.1",
     "vite": "^8.0.0"
   },
